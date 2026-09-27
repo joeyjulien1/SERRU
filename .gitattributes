@@ -1,0 +1,7 @@
+# Keep LF line endings in the repository and on checkout (servers run Linux).
+* text=auto eol=lf
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.webp binary
+*.pdf binary
