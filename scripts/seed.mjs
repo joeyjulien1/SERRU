@@ -11,7 +11,7 @@ import { dataDir, openDb, root } from './db.mjs';
 const missing = ['TURSO_DATABASE_URL', 'BLOB_READ_WRITE_TOKEN'].filter((k) => !process.env[k]);
 if (process.env.VERCEL && missing.length) {
   console.error(`✗ Build stopped: ${missing.join(' and ')} not set. Connect a Turso database and a Blob store to this project (Vercel → Storage), then redeploy.`);
-  process.exit(1);
+  process.exit(10);
 }
 
 const uploads = path.join(dataDir, 'uploads');
@@ -144,19 +144,24 @@ function passwordMatches(password, stored) {
 const adminEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
 // Trimmed: a pasted value easily carries a trailing space or line break that nobody types at sign-in.
 const adminPassword = (process.env.ADMIN_PASSWORD || '').trim();
-const adminProblem = !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)
-  ? 'ADMIN_EMAIL is missing or not an email address'
-  : adminPassword.length < 8
-    ? 'ADMIN_PASSWORD is missing or shorter than 8 characters'
-    : process.env.VERCEL && adminPassword === 'change-me-to-a-long-random-password'
-      ? 'ADMIN_PASSWORD is still the public example value from .env.example'
-      : null;
+// Each problem has its own exit code: Vercel shows "exited with N" on the deployment even where the log is not at hand.
+const [adminExitCode, adminProblem] = !adminEmail
+  ? [11, 'ADMIN_EMAIL is empty']
+  : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)
+    ? [12, 'ADMIN_EMAIL is not an email address']
+    : !adminPassword
+      ? [13, 'ADMIN_PASSWORD is empty']
+      : adminPassword.length < 8
+        ? [14, 'ADMIN_PASSWORD is shorter than 8 characters']
+        : process.env.VERCEL && adminPassword === 'change-me-to-a-long-random-password'
+          ? [15, 'ADMIN_PASSWORD is still the public example value from .env.example']
+          : [0, null];
 
 if (adminProblem) {
   const adminCount = (await one('SELECT COUNT(*) AS n FROM admins')).n;
   if (process.env.VERCEL && adminCount === 0) {
     console.error(`✗ Build stopped: no admin account can be created — ${adminProblem}. Fix it in Vercel → Settings → Environment Variables, then redeploy.`);
-    process.exit(1);
+    process.exit(adminExitCode);
   }
   console.warn(`! Admin not created or updated: ${adminProblem}.`);
 } else {
