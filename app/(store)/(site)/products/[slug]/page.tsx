@@ -5,6 +5,7 @@ import { Icon } from '@/components/Icon';
 import { BuyBox } from '@/components/store/BuyBox';
 import { Gallery } from '@/components/store/Gallery';
 import { ProductBadges, ProductCard } from '@/components/store/ProductCard';
+import { WallPreview } from '@/components/store/WallPreview';
 import { getProductBySlug, relatedProducts } from '@/lib/catalog';
 import { formatMoney } from '@/lib/format';
 import { storeUrl } from '@/lib/hosts';
@@ -157,6 +158,14 @@ export default async function ProductPage(props: PageProps<'/products/[slug]'>) 
           </div>
         </div>
       </div>
+
+      {product.images[0] && (
+        <WallPreview
+          slug={product.slug}
+          title={product.title}
+          art={{ url: product.images[0].url, width: product.images[0].width, height: product.images[0].height }}
+        />
+      )}
 
       {related.length > 0 && (
         <section className="section section--paper" aria-labelledby="related-title">

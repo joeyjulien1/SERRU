@@ -184,7 +184,7 @@ export default async function HomePage() {
               </p>
             </div>
             <Link href="/contact?subject=Commission" className="btn btn--light btn--lg">
-              Start a commission <Icon name="arrowRight" size={18} />
+              Contact us <Icon name="arrowRight" size={18} />
             </Link>
           </div>
         </div>

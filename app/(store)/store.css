@@ -2095,3 +2095,182 @@
   margin-top: 2px;
   color: var(--teal-700);
 }
+
+/* ───────────── See it on your wall (product page) ───────────── */
+
+.wall {
+  border-top: 1px solid var(--line);
+}
+.wall__grid {
+  display: grid;
+  gap: 28px;
+}
+@media (min-width: 1024px) {
+  .wall__grid {
+    grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr);
+    gap: 56px;
+    align-items: start;
+  }
+}
+.wall__stage {
+  min-width: 0;
+}
+.wall__empty {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  min-height: clamp(280px, 42vw, 480px);
+  padding: 32px 20px;
+  border: 1px dashed var(--line-2);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  color: var(--teal-700);
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color 0.2s var(--ease),
+    background-color 0.2s var(--ease);
+}
+.wall__empty:hover {
+  border-color: var(--teal-500);
+  background: var(--paper-2);
+}
+.wall__empty .btn {
+  margin-top: 8px;
+}
+.wall__frame {
+  position: relative;
+  width: 100%;
+  margin-inline: auto;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.wall__frame[data-editing] {
+  cursor: crosshair;
+}
+.wall__photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+.wall__art {
+  position: absolute;
+  cursor: move;
+  outline: 1px dashed rgb(255 255 255 / 0.9);
+  outline-offset: 3px;
+  box-shadow:
+    0 10px 24px rgb(0 0 0 / 0.28),
+    0 2px 6px rgb(0 0 0 / 0.18);
+}
+.wall__art:focus-visible {
+  outline: 2px solid var(--teal-500);
+}
+.wall__art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+.wall__handle {
+  position: absolute;
+  right: -11px;
+  bottom: -11px;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--white);
+  border-radius: 50%;
+  background: var(--teal-700);
+  box-shadow: var(--shadow-sm);
+  cursor: nwse-resize;
+}
+.wall__handle::after {
+  content: '';
+  position: absolute;
+  inset: -10px; /* larger touch target */
+}
+.wall__badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  background: rgb(12 38 36 / 0.78);
+  color: var(--white);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.wall__panel {
+  display: grid;
+  gap: 20px;
+}
+.wall__steps {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: wall;
+}
+.wall__steps li {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  padding-left: 46px;
+  counter-increment: wall;
+}
+.wall__steps li::before {
+  content: counter(wall);
+  position: absolute;
+  top: -3px;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line-2);
+  border-radius: 50%;
+  font-size: 13px;
+  color: var(--teal-700);
+  transition:
+    background-color 0.2s var(--ease),
+    color 0.2s var(--ease),
+    border-color 0.2s var(--ease);
+}
+.wall__steps li[data-done]::before {
+  content: '✓';
+  border-color: var(--teal-700);
+  background: var(--teal-700);
+  color: var(--white);
+}
+.wall__steps strong {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.wall__steps span {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.wall__actions {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+.wall__actions label.btn {
+  cursor: pointer;
+}
+.wall__note {
+  line-height: 1.6;
+}
