@@ -58,8 +58,8 @@ export function mapCustomer(row: CustomerRow): Customer {
   };
 }
 
-export function getCustomerById(id: number): Customer | null {
-  const row = get<CustomerRow>(
+export async function getCustomerById(id: number): Promise<Customer | null> {
+  const row = await get<CustomerRow>(
     'SELECT id, email, first_name, last_name, phone, accepts_marketing, default_address, created_at FROM customers WHERE id = ?',
     id,
   );

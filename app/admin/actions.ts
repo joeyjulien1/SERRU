@@ -9,10 +9,10 @@ import { all, get, run, tx } from '@/lib/db';
 import { CURRENCIES, formatMoney, orderLabel, parseMoneyToCents, slugify } from '@/lib/format';
 import { storeUrl } from '@/lib/hosts';
 import { sendMail } from '@/lib/mailer';
-import { getOrder, recordRefund, updateFulfillment, FULFILLMENT_STATUSES, type FulfillmentStatus } from '@/lib/orders';
+import { getOrder, markOrderPaid, recordRefund, updateFulfillment, FULFILLMENT_STATUSES, type FulfillmentStatus } from '@/lib/orders';
 import { savePage } from '@/lib/pages';
 import { dummyPasswordHash, hashPassword, PASSWORD_MIN, verifyPassword } from '@/lib/password';
-import { stripe } from '@/lib/payments';
+import { createTapRefund } from '@/lib/payments';
 import { clientIp, rateLimit } from '@/lib/rate-limit';
 import { createSession, destroyAllSessions, destroySession } from '@/lib/session';
 import { getSettings, saveSettings, SETTING_DEFAULTS, type SettingKey } from '@/lib/settings';
@@ -33,11 +33,11 @@ export async function adminLoginAction(_: FormState, data: FormData): Promise<Fo
   if (!rateLimit(`admin-login:${ip}`, 8, 15 * 60_000) || !rateLimit(`admin-login:${email}`, 8, 15 * 60_000)) {
     return { ok: false, message: 'Too many attempts. Please wait 15 minutes and try again.', values };
   }
-  const row = get<{ id: number; password_hash: string }>('SELECT id, password_hash FROM admins WHERE email = ?', email);
+  const row = await get<{ id: number; password_hash: string }>('SELECT id, password_hash FROM admins WHERE email = ?', email);
   const valid = await verifyPassword(password, row?.password_hash ?? (await dummyPasswordHash()));
   if (!row || !valid) return { ok: false, message: 'Incorrect email or password.', values };
 
-  run("UPDATE admins SET last_login_at = datetime('now') WHERE id = ?", row.id);
+  await run("UPDATE admins SET last_login_at = datetime('now') WHERE id = ?", row.id);
   await createSession('admin', row.id);
   return { ok: true, redirectTo: '/' };
 }
@@ -124,18 +124,18 @@ export async function saveProductAction(_: FormState, data: FormData): Promise<F
   const imageIds = z.array(z.number().int().positive()).max(30).safeParse(imageIdsRaw);
   if (!imageIds.success) return { ok: false, message: 'Invalid images.', values };
   const validImageIds = imageIds.data.length
-    ? all<{ id: number }>(`SELECT id FROM media WHERE id IN (${imageIds.data.map(() => '?').join(',')})`, ...imageIds.data).map((r) => r.id)
+    ? (await all<{ id: number }>(`SELECT id FROM media WHERE id IN (${imageIds.data.map(() => '?').join(',')})`, ...imageIds.data)).map((r) => r.id)
     : [];
   const orderedImages = imageIds.data.filter((m) => validImageIds.includes(m));
 
   const categoryId = Number(base.data.categoryId) || null;
-  if (categoryId && !get('SELECT id FROM categories WHERE id = ?', categoryId)) {
+  if (categoryId && !(await get('SELECT id FROM categories WHERE id = ?', categoryId))) {
     return { ok: false, errors: { categoryId: 'Choose a category' }, values };
   }
 
   // Unique slug
   let slug = slugify(base.data.slug || base.data.title);
-  for (let n = 2; get('SELECT id FROM products WHERE slug = ? AND id != ?', slug, id ?? 0); n++) {
+  for (let n = 2; await get('SELECT id FROM products WHERE slug = ? AND id != ?', slug, id ?? 0); n++) {
     slug = `${slugify(base.data.slug || base.data.title)}-${n}`;
   }
 
@@ -145,10 +145,10 @@ export async function saveProductAction(_: FormState, data: FormData): Promise<F
     mto: bool(data.get('madeToOrder')) ? 1 : 0,
   };
 
-  const productId = tx(() => {
+  const productId = await tx(async () => {
     let pid = id;
     if (pid) {
-      const res = run(
+      const res = await run(
         `UPDATE products SET title = ?, slug = ?, category_id = ?, description = ?, materials = ?, status = ?,
            is_hot = ?, is_one_of_one = ?, made_to_order = ?, lead_time = ?, updated_at = datetime('now') WHERE id = ?`,
         base.data.title,
@@ -165,28 +165,30 @@ export async function saveProductAction(_: FormState, data: FormData): Promise<F
       );
       if (res.changes === 0) throw new Error('Product not found');
     } else {
-      pid = run(
-        `INSERT INTO products (title, slug, category_id, description, materials, status, is_hot, is_one_of_one, made_to_order, lead_time)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        base.data.title,
-        slug,
-        categoryId,
-        base.data.description,
-        base.data.materials,
-        base.data.status,
-        flags.hot,
-        flags.ooo,
-        flags.mto,
-        base.data.leadTime,
+      pid = (
+        await run(
+          `INSERT INTO products (title, slug, category_id, description, materials, status, is_hot, is_one_of_one, made_to_order, lead_time)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          base.data.title,
+          slug,
+          categoryId,
+          base.data.description,
+          base.data.materials,
+          base.data.status,
+          flags.hot,
+          flags.ooo,
+          flags.mto,
+          base.data.leadTime,
+        )
       ).lastId;
     }
 
-    const existing = new Set(all<{ id: number }>('SELECT id FROM variants WHERE product_id = ?', pid).map((r) => r.id));
+    const existing = new Set((await all<{ id: number }>('SELECT id FROM variants WHERE product_id = ?', pid)).map((r) => r.id));
     const kept = new Set<number>();
-    variants.forEach((v, position) => {
+    for (const [position, v] of variants.entries()) {
       if (v.id && existing.has(v.id)) {
         kept.add(v.id);
-        run(
+        await run(
           'UPDATE variants SET label = ?, sku = ?, price_cents = ?, compare_at_cents = ?, stock = ?, position = ? WHERE id = ? AND product_id = ?',
           v.label,
           v.sku,
@@ -198,7 +200,7 @@ export async function saveProductAction(_: FormState, data: FormData): Promise<F
           pid,
         );
       } else {
-        run(
+        await run(
           'INSERT INTO variants (product_id, label, sku, price_cents, compare_at_cents, stock, position) VALUES (?, ?, ?, ?, ?, ?, ?)',
           pid,
           v.label,
@@ -209,13 +211,18 @@ export async function saveProductAction(_: FormState, data: FormData): Promise<F
           position,
         );
       }
-    });
-    for (const vid of existing) if (!kept.has(vid)) run('DELETE FROM variants WHERE id = ?', vid);
+    }
+    for (const vid of existing) {
+      if (kept.has(vid)) continue;
+      // References are cleared explicitly: foreign-key enforcement is not guaranteed on the hosted database.
+      await run('UPDATE order_items SET variant_id = NULL WHERE variant_id = ?', vid);
+      await run('DELETE FROM variants WHERE id = ?', vid);
+    }
 
-    run('DELETE FROM product_images WHERE product_id = ?', pid);
-    orderedImages.forEach((mid, position) =>
-      run('INSERT INTO product_images (product_id, media_id, position) VALUES (?, ?, ?)', pid, mid, position),
-    );
+    await run('DELETE FROM product_images WHERE product_id = ?', pid);
+    for (const [position, mid] of orderedImages.entries()) {
+      await run('INSERT INTO product_images (product_id, media_id, position) VALUES (?, ?, ?)', pid, mid, position);
+    }
     return pid;
   });
 
@@ -226,13 +233,19 @@ export async function saveProductAction(_: FormState, data: FormData): Promise<F
 
 export async function deleteProductAction(id: number): Promise<ActionResult> {
   await requireAdmin();
-  run('DELETE FROM products WHERE id = ?', id);
+  // Same effect as the schema's ON DELETE rules, without relying on foreign-key enforcement.
+  await tx(async () => {
+    await run('UPDATE order_items SET product_id = NULL, variant_id = NULL WHERE product_id = ?', id);
+    await run('DELETE FROM product_images WHERE product_id = ?', id);
+    await run('DELETE FROM variants WHERE product_id = ?', id);
+    await run('DELETE FROM products WHERE id = ?', id);
+  });
   return { redirectTo: '/products?deleted=1' };
 }
 
 export async function toggleHotAction(id: number): Promise<void> {
   await requireAdmin();
-  run("UPDATE products SET is_hot = 1 - is_hot, updated_at = datetime('now') WHERE id = ?", id);
+  await run("UPDATE products SET is_hot = 1 - is_hot, updated_at = datetime('now') WHERE id = ?", id);
   refresh();
 }
 
@@ -259,14 +272,14 @@ export async function saveCategoryAction(_: FormState, data: FormData): Promise<
     });
   if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error), values };
   const slug = slugify(parsed.data.slug || parsed.data.name);
-  if (get('SELECT id FROM categories WHERE slug = ? AND id != ?', slug, id ?? 0)) {
+  if (await get('SELECT id FROM categories WHERE slug = ? AND id != ?', slug, id ?? 0)) {
     return { ok: false, errors: { slug: 'Another category already uses this URL' }, values };
   }
   const mediaId = Number(parsed.data.mediaId) || null;
-  if (mediaId && !get('SELECT id FROM media WHERE id = ?', mediaId)) return { ok: false, message: 'Image not found', values };
+  if (mediaId && !(await get('SELECT id FROM media WHERE id = ?', mediaId))) return { ok: false, message: 'Image not found', values };
 
   if (id) {
-    run(
+    await run(
       'UPDATE categories SET name = ?, slug = ?, description = ?, position = ?, media_id = ? WHERE id = ?',
       parsed.data.name,
       slug,
@@ -278,7 +291,7 @@ export async function saveCategoryAction(_: FormState, data: FormData): Promise<
     refresh();
     return { ok: true, message: `${parsed.data.name} saved.` };
   }
-  run(
+  await run(
     'INSERT INTO categories (name, slug, description, position, media_id) VALUES (?, ?, ?, ?, ?)',
     parsed.data.name,
     slug,
@@ -292,7 +305,10 @@ export async function saveCategoryAction(_: FormState, data: FormData): Promise<
 
 export async function deleteCategoryAction(id: number): Promise<ActionResult> {
   await requireAdmin();
-  run('DELETE FROM categories WHERE id = ?', id);
+  await tx(async () => {
+    await run('UPDATE products SET category_id = NULL WHERE category_id = ?', id);
+    await run('DELETE FROM categories WHERE id = ?', id);
+  });
   return { redirectTo: '/categories?deleted=1' };
 }
 
@@ -301,22 +317,23 @@ export async function deleteCategoryAction(id: number): Promise<ActionResult> {
 export async function updateOrderAction(_: FormState, data: FormData): Promise<FormState> {
   await requireAdmin();
   const id = Number(str(data.get('id')));
-  const order = getOrder(id);
+  const order = await getOrder(id);
   if (!order) return { ok: false, message: 'Order not found.' };
   const status = str(data.get('fulfillment')) as FulfillmentStatus;
   if (!FULFILLMENT_STATUSES.includes(status)) return { ok: false, message: 'Choose a status.' };
   const tracking = str(data.get('tracking')).slice(0, 120);
   const note = str(data.get('note')).slice(0, 2000);
   const restock = bool(data.get('restock'));
-  if (status === 'shipped' && order.paymentStatus !== 'paid') {
-    return { ok: false, message: 'Only paid orders can be marked as shipped.' };
+  const codDue = order.paymentProvider === 'cod' && order.paymentStatus === 'pending';
+  if ((status === 'shipped' || status === 'delivered') && order.paymentStatus !== 'paid' && !codDue) {
+    return { ok: false, message: 'Only paid or cash-on-delivery orders can be shipped.' };
   }
 
-  updateFulfillment(id, status, tracking, note, restock);
+  await updateFulfillment(id, status, tracking, note, restock);
 
   const notify = bool(data.get('notify'));
   if (notify && status !== order.fulfillmentStatus && (status === 'shipped' || status === 'delivered')) {
-    const settings = getSettings();
+    const settings = await getSettings();
     await sendMail({
       to: order.email,
       subject:
@@ -337,59 +354,93 @@ export async function updateOrderAction(_: FormState, data: FormData): Promise<F
 export async function refundOrderAction(_: FormState, data: FormData): Promise<FormState> {
   await requireAdmin('owner');
   const id = Number(str(data.get('id')));
-  const order = getOrder(id);
+  const order = await getOrder(id);
   if (!order || order.paymentStatus !== 'paid') return { ok: false, message: 'Only paid orders can be refunded.' };
   const restock = bool(data.get('restock'));
 
   let ref: string;
-  if (order.paymentProvider === 'stripe') {
-    if (!order.paymentRef) return { ok: false, message: 'This order has no Stripe payment to refund.' };
+  let message = 'Refunded from admin';
+  if (order.paymentProvider === 'tap') {
+    if (!order.paymentRef) return { ok: false, message: 'This order has no Tap payment to refund.' };
     try {
-      const refund = await stripe().refunds.create(
-        { payment_intent: order.paymentRef, reason: 'requested_by_customer' },
-        { idempotencyKey: `serru-refund-${order.id}` },
-      );
+      const refund = await createTapRefund({
+        chargeId: order.paymentRef,
+        amountCents: order.totalCents,
+        currency: order.currency,
+        orderNumber: order.number,
+      });
+      const status = String(refund.status).toUpperCase();
+      if (status !== 'REFUNDED' && status !== 'PENDING') {
+        return { ok: false, message: `Tap did not accept the refund (${status}${refund.response?.message ? `: ${refund.response.message}` : ''}).` };
+      }
       ref = refund.id;
+      if (status === 'PENDING') message = 'Refund submitted to Tap (processing)';
     } catch (err) {
       console.error('[admin] refund failed', err);
-      return { ok: false, message: err instanceof Error ? `Stripe refused the refund: ${err.message}` : 'Refund failed.' };
+      return { ok: false, message: err instanceof Error ? `Tap refused the refund: ${err.message}` : 'Refund failed.' };
     }
+  } else if (order.paymentProvider === 'cod') {
+    ref = `cash_refund_${order.number}`;
+    message = 'Cash refund recorded';
   } else {
     ref = `test_refund_${order.number}`;
   }
 
-  recordRefund(
+  await recordRefund(
     order.id,
-    { provider: order.paymentProvider, ref, amountCents: order.totalCents, currency: order.currency, message: 'Refunded from admin' },
+    { provider: order.paymentProvider, ref, amountCents: order.totalCents, currency: order.currency, message },
     restock,
   );
-  const settings = getSettings();
+  const settings = await getSettings();
   await sendMail({
     to: order.email,
     subject: `Refund for ${settings.store_name} order ${orderLabel(order.number)}`,
-    text: `Hi ${order.shipName.split(' ')[0]},\n\nWe've refunded ${formatMoney(order.totalCents, order.currency)} for order ${orderLabel(order.number)} to your original payment card. Depending on your bank it can take 5–10 business days to appear.\n\n${settings.store_name}`,
+    text:
+      `Hi ${order.shipName.split(' ')[0]},\n\n` +
+      (order.paymentProvider === 'cod'
+        ? `We've refunded ${formatMoney(order.totalCents, order.currency)} for order ${orderLabel(order.number)}.`
+        : `We've refunded ${formatMoney(order.totalCents, order.currency)} for order ${orderLabel(order.number)} to your original payment card. Depending on your bank it can take 5–10 business days to appear.`) +
+      `\n\n${settings.store_name}`,
   });
   refresh();
-  return { ok: true, message: 'Refund issued.' };
+  return { ok: true, message: order.paymentProvider === 'cod' ? 'Refund recorded.' : 'Refund issued.' };
+}
+
+/** Cash-on-delivery order: the courier collected the cash. */
+export async function markCodPaidAction(orderId: number): Promise<ActionResult> {
+  await requireAdmin();
+  const order = await getOrder(orderId);
+  if (!order || order.paymentProvider !== 'cod') return { error: 'This is not a cash-on-delivery order.' };
+  if (order.paymentStatus !== 'pending') return { error: 'This order is not awaiting payment.' };
+  if (order.fulfillmentStatus === 'cancelled') return { error: 'This order was cancelled.' };
+  await markOrderPaid(order.id, {
+    provider: 'cod',
+    ref: `cash_${order.number}`,
+    amountCents: order.totalCents,
+    currency: order.currency,
+    message: 'Cash collected on delivery',
+  });
+  refresh();
+  return undefined;
 }
 
 // ───────────── Inbox ─────────────
 
 export async function setMessageReadAction(id: number, read: boolean): Promise<void> {
   await requireAdmin();
-  run('UPDATE messages SET is_read = ? WHERE id = ?', read ? 1 : 0, id);
+  await run('UPDATE messages SET is_read = ? WHERE id = ?', read ? 1 : 0, id);
   refresh();
 }
 
 export async function deleteMessageAction(id: number): Promise<void> {
   await requireAdmin();
-  run('DELETE FROM messages WHERE id = ?', id);
+  await run('DELETE FROM messages WHERE id = ?', id);
   refresh();
 }
 
 export async function deleteSubscriberAction(id: number): Promise<void> {
   await requireAdmin();
-  run('DELETE FROM subscribers WHERE id = ?', id);
+  await run('DELETE FROM subscribers WHERE id = ?', id);
   refresh();
 }
 
@@ -407,10 +458,10 @@ export async function savePageAction(_: FormState, data: FormData): Promise<Form
   if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error), values: formValues(data) };
   const slug = slugify(parsed.data.slug);
   const isNew = str(data.get('isNew')) === '1';
-  if (isNew && get('SELECT slug FROM pages WHERE slug = ?', slug)) {
+  if (isNew && (await get('SELECT slug FROM pages WHERE slug = ?', slug))) {
     return { ok: false, errors: { slug: 'A page with this URL already exists' }, values: formValues(data) };
   }
-  savePage(slug, parsed.data.title, parsed.data.body.trim());
+  await savePage(slug, parsed.data.title, parsed.data.body.trim());
   if (isNew) return { ok: true, message: 'Page created.', redirectTo: `/pages/${slug}?created=1` };
   refresh();
   return { ok: true, message: 'Page saved.' };
@@ -418,7 +469,7 @@ export async function savePageAction(_: FormState, data: FormData): Promise<Form
 
 export async function deletePageAction(slug: string): Promise<ActionResult> {
   await requireAdmin('owner');
-  run('DELETE FROM pages WHERE slug = ?', slug);
+  await run('DELETE FROM pages WHERE slug = ?', slug);
   return { redirectTo: '/pages?deleted=1' };
 }
 
@@ -451,6 +502,9 @@ export async function saveSettingsAction(_: FormState, data: FormData): Promise<
   text('stat_crafted', 9);
   text('stat_collectors', 9);
 
+  // Checkbox: absent from the form data when unticked, so a hidden marker tells us it was on the page.
+  if (data.has('cod_enabled_present')) next.cod_enabled = bool(data.get('cod_enabled')) ? '1' : '0';
+
   if (next.contact_email && !EMAIL_PATTERN.test(next.contact_email)) errors.contact_email = 'Enter a valid email address';
   for (const k of ['stat_crafted', 'stat_collectors'] as const) {
     if (next[k] && !/^\d+$/.test(next[k]!)) errors[k] = 'Numbers only (leave empty to hide)';
@@ -478,13 +532,13 @@ export async function saveSettingsAction(_: FormState, data: FormData): Promise<
   }
   if (data.has('hero_media_id')) {
     const raw = str(data.get('hero_media_id'));
-    if (raw && !get('SELECT id FROM media WHERE id = ?', Number(raw))) errors.hero_media_id = 'Image not found';
+    if (raw && !(await get('SELECT id FROM media WHERE id = ?', Number(raw)))) errors.hero_media_id = 'Image not found';
     else next.hero_media_id = raw;
   }
 
   if (Object.keys(errors).length) return { ok: false, errors, message: 'Please fix the highlighted fields.', values };
   // Ignore anything that isn't a known setting.
-  saveSettings(Object.fromEntries(Object.entries(next).filter(([k]) => k in SETTING_DEFAULTS)));
+  await saveSettings(Object.fromEntries(Object.entries(next).filter(([k]) => k in SETTING_DEFAULTS)));
   refresh();
   return { ok: true, message: 'Settings saved.' };
 }
@@ -500,9 +554,9 @@ export async function changeAdminPasswordAction(_: FormState, data: FormData): P
   if (password.length < 10) errors.password = 'Use at least 10 characters for admin accounts';
   if (password !== confirm) errors.confirm = 'Passwords do not match';
   if (Object.keys(errors).length) return { ok: false, errors };
-  const row = get<{ password_hash: string }>('SELECT password_hash FROM admins WHERE id = ?', admin.id);
+  const row = await get<{ password_hash: string }>('SELECT password_hash FROM admins WHERE id = ?', admin.id);
   if (!row || !(await verifyPassword(current, row.password_hash))) return { ok: false, errors: { current: 'Current password is incorrect' } };
-  run('UPDATE admins SET password_hash = ? WHERE id = ?', await hashPassword(password), admin.id);
+  await run('UPDATE admins SET password_hash = ? WHERE id = ?', await hashPassword(password), admin.id);
   await destroyAllSessions('admin', admin.id, true);
   refresh();
   return { ok: true, message: 'Password changed. Other devices were signed out.' };
@@ -519,9 +573,9 @@ export async function addAdminAction(_: FormState, data: FormData): Promise<Form
   if (!name) errors.name = 'Enter a name';
   if (!EMAIL_PATTERN.test(email)) errors.email = 'Enter a valid email address';
   if (password.length < Math.max(PASSWORD_MIN, 10)) errors.password = 'Use at least 10 characters';
-  if (!errors.email && get('SELECT id FROM admins WHERE email = ?', email)) errors.email = 'This email already has admin access';
+  if (!errors.email && (await get('SELECT id FROM admins WHERE email = ?', email))) errors.email = 'This email already has admin access';
   if (Object.keys(errors).length) return { ok: false, errors, values };
-  run('INSERT INTO admins (email, name, password_hash, role) VALUES (?, ?, ?, ?)', email, name, await hashPassword(password), role);
+  await run('INSERT INTO admins (email, name, password_hash, role) VALUES (?, ?, ?, ?)', email, name, await hashPassword(password), role);
   refresh();
   return { ok: true, message: `${name} can now sign in to the admin panel.` };
 }
@@ -529,13 +583,13 @@ export async function addAdminAction(_: FormState, data: FormData): Promise<Form
 export async function removeAdminAction(id: number): Promise<ActionResult> {
   const me = await requireAdmin('owner');
   if (id === me.id) return { error: 'You cannot remove your own account.' };
-  const target = get<{ role: string }>('SELECT role FROM admins WHERE id = ?', id);
+  const target = await get<{ role: string }>('SELECT role FROM admins WHERE id = ?', id);
   if (!target) return undefined;
-  if (target.role === 'owner' && (get<{ n: number }>("SELECT COUNT(*) AS n FROM admins WHERE role = 'owner'")?.n ?? 0) <= 1) {
+  if (target.role === 'owner' && ((await get<{ n: number }>("SELECT COUNT(*) AS n FROM admins WHERE role = 'owner'"))?.n ?? 0) <= 1) {
     return { error: 'The store needs at least one owner.' };
   }
-  run('DELETE FROM admins WHERE id = ?', id);
-  run("DELETE FROM sessions WHERE kind = 'admin' AND user_id = ?", id);
+  await run('DELETE FROM admins WHERE id = ?', id);
+  await run("DELETE FROM sessions WHERE kind = 'admin' AND user_id = ?", id);
   refresh();
   return undefined;
 }

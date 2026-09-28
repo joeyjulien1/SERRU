@@ -21,9 +21,9 @@ const sha256 = (value: string) => crypto.createHash('sha256').update(value).dige
 export async function createSession(kind: SessionKind, userId: number): Promise<void> {
   const token = crypto.randomBytes(32).toString('base64url');
   const expiresAt = Date.now() + TTL_MS[kind];
-  run('INSERT INTO sessions (id, kind, user_id, expires_at) VALUES (?, ?, ?, ?)', sha256(token), kind, userId, expiresAt);
+  await run('INSERT INTO sessions (id, kind, user_id, expires_at) VALUES (?, ?, ?, ?)', sha256(token), kind, userId, expiresAt);
   // Opportunistic cleanup of expired sessions.
-  run('DELETE FROM sessions WHERE expires_at < ?', Date.now());
+  await run('DELETE FROM sessions WHERE expires_at < ?', Date.now());
 
   const jar = await cookies();
   jar.set(COOKIE[kind], token, {
@@ -40,7 +40,7 @@ export async function readSession(kind: SessionKind): Promise<number | null> {
   const jar = await cookies();
   const token = jar.get(COOKIE[kind])?.value;
   if (!token) return null;
-  const row = get<{ user_id: number; expires_at: number }>(
+  const row = await get<{ user_id: number; expires_at: number }>(
     'SELECT user_id, expires_at FROM sessions WHERE id = ? AND kind = ?',
     sha256(token),
     kind,
@@ -52,19 +52,19 @@ export async function readSession(kind: SessionKind): Promise<number | null> {
 export async function destroySession(kind: SessionKind): Promise<void> {
   const jar = await cookies();
   const token = jar.get(COOKIE[kind])?.value;
-  if (token) run('DELETE FROM sessions WHERE id = ?', sha256(token));
+  if (token) await run('DELETE FROM sessions WHERE id = ?', sha256(token));
   jar.delete(COOKIE[kind]);
 }
 
 /** Signs a user out everywhere (e.g. after a password change), optionally keeping the current session. */
 export async function destroyAllSessions(kind: SessionKind, userId: number, keepCurrent = false): Promise<void> {
   if (!keepCurrent) {
-    run('DELETE FROM sessions WHERE kind = ? AND user_id = ?', kind, userId);
+    await run('DELETE FROM sessions WHERE kind = ? AND user_id = ?', kind, userId);
     return;
   }
   const jar = await cookies();
   const token = jar.get(COOKIE[kind])?.value;
-  run('DELETE FROM sessions WHERE kind = ? AND user_id = ? AND id != ?', kind, userId, token ? sha256(token) : '');
+  await run('DELETE FROM sessions WHERE kind = ? AND user_id = ? AND id != ?', kind, userId, token ? sha256(token) : '');
 }
 
 export function hashToken(token: string): string {

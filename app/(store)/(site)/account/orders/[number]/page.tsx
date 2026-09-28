@@ -13,7 +13,7 @@ export default async function AccountOrderPage(props: PageProps<'/account/orders
   const customer = await getCurrentCustomer();
   if (!customer) redirect('/account/login');
   const { number } = await props.params;
-  const order = getOrderByNumber(Number(number));
+  const order = await getOrderByNumber(Number(number));
   if (!order || order.customerId !== customer.id) notFound();
   return (
     <div className="container container--narrow" style={{ paddingBlock: '32px 96px' }}>
@@ -23,7 +23,7 @@ export default async function AccountOrderPage(props: PageProps<'/account/orders
       <h1 className="h2" style={{ marginBottom: 24 }}>
         Order {orderLabel(order.number)}
       </h1>
-      <OrderView order={order} items={getOrderItems(order.id)} />
+      <OrderView order={order} items={await getOrderItems(order.id)} />
     </div>
   );
 }

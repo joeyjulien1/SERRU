@@ -4,7 +4,7 @@ const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=(self "https://js.stripe.com")' },
+  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=(self)' },
 ];
 
 const nextConfig: NextConfig = {
@@ -13,6 +13,8 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   serverExternalPackages: ['sharp'],
+  // lib/db.ts reads the schema at runtime; make sure it ships with every server function on Vercel.
+  outputFileTracingIncludes: { '/**': ['./lib/schema.sql'] },
   experimental: {
     // Product photos from phones can be large; the proxy buffers request bodies up to this size.
     proxyClientMaxBodySize: '30mb',

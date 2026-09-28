@@ -14,8 +14,8 @@ export default async function CustomersPage(props: PageProps<'/admin/customers'>
   const sp = (await props.searchParams) as { q?: string; page?: string };
   const q = sp.q?.trim() ?? '';
   const page = Math.max(1, Number(sp.page) || 1);
-  const { items, total } = listCustomers(q, PAGE_SIZE, (page - 1) * PAGE_SIZE);
-  const currency = getSettings().currency;
+  const { items, total } = await listCustomers(q, PAGE_SIZE, (page - 1) * PAGE_SIZE);
+  const currency = (await getSettings()).currency;
 
   return (
     <>

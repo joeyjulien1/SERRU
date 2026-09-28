@@ -6,8 +6,8 @@ import { storeUrl } from '@/lib/hosts';
 
 export const metadata: Metadata = { title: 'Add product' };
 
-export default function NewProductPage() {
-  const categories = listCategories().map((c) => ({ id: c.id, name: c.name }));
+export default async function NewProductPage() {
+  const categories = (await listCategories()).map((c) => ({ id: c.id, name: c.name }));
   return (
     <>
       <PageHead title="Add product" back={{ href: '/products', label: 'Products' }} />

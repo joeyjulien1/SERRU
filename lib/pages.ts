@@ -3,22 +3,23 @@ import { all, get, run } from './db';
 
 export type Page = { slug: string; title: string; body: string; updatedAt: string };
 
-export function getPage(slug: string): Page | null {
-  const r = get<{ slug: string; title: string; body: string; updated_at: string }>(
+export async function getPage(slug: string): Promise<Page | null> {
+  const r = await get<{ slug: string; title: string; body: string; updated_at: string }>(
     'SELECT slug, title, body, updated_at FROM pages WHERE slug = ?',
     slug,
   );
   return r ? { slug: r.slug, title: r.title, body: r.body, updatedAt: r.updated_at } : null;
 }
 
-export function listPages(): Page[] {
-  return all<{ slug: string; title: string; body: string; updated_at: string }>(
+export async function listPages(): Promise<Page[]> {
+  const rows = await all<{ slug: string; title: string; body: string; updated_at: string }>(
     'SELECT slug, title, body, updated_at FROM pages ORDER BY title',
-  ).map((r) => ({ slug: r.slug, title: r.title, body: r.body, updatedAt: r.updated_at }));
+  );
+  return rows.map((r) => ({ slug: r.slug, title: r.title, body: r.body, updatedAt: r.updated_at }));
 }
 
-export function savePage(slug: string, title: string, body: string): void {
-  run(
+export async function savePage(slug: string, title: string, body: string): Promise<void> {
+  await run(
     `INSERT INTO pages (slug, title, body, updated_at) VALUES (?, ?, ?, datetime('now'))
      ON CONFLICT(slug) DO UPDATE SET title = excluded.title, body = excluded.body, updated_at = excluded.updated_at`,
     slug,

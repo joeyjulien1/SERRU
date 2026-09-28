@@ -120,7 +120,8 @@ CREATE TABLE IF NOT EXISTS orders (
   subtotal_cents      INTEGER NOT NULL,
   shipping_cents      INTEGER NOT NULL,
   total_cents         INTEGER NOT NULL,
-  payment_provider    TEXT    NOT NULL CHECK (payment_provider IN ('stripe', 'test')),
+  -- tap: card via Tap Payments · cod: cash on delivery · test: built-in test checkout (development)
+  payment_provider    TEXT    NOT NULL CHECK (payment_provider IN ('tap', 'cod', 'test')),
   payment_ref         TEXT,
   payment_status      TEXT    NOT NULL DEFAULT 'pending'
                         CHECK (payment_status IN ('pending', 'paid', 'failed', 'expired', 'refunded')),

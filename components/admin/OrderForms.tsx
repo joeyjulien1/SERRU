@@ -21,13 +21,13 @@ export function FulfillmentForm({
   status,
   tracking,
   note,
-  paid,
+  canShip,
 }: {
   orderId: number;
   status: FulfillmentStatus;
   tracking: string;
   note: string;
-  paid: boolean;
+  canShip: boolean;
 }) {
   const [state, action, pending] = useFormAction(updateOrderAction);
   const [next, setNext] = useState<FulfillmentStatus>(status);
@@ -45,7 +45,7 @@ export function FulfillmentForm({
         </label>
         <select id="f-status" name="fulfillment" className="select" value={next} onChange={(e) => setNext(e.target.value as FulfillmentStatus)}>
           {(Object.keys(LABELS) as FulfillmentStatus[]).map((s) => (
-            <option key={s} value={s} disabled={!paid && (s === 'shipped' || s === 'delivered')}>
+            <option key={s} value={s} disabled={!canShip && (s === 'shipped' || s === 'delivered')}>
               {LABELS[s]}
             </option>
           ))}
@@ -82,16 +82,34 @@ export function FulfillmentForm({
   );
 }
 
-export function RefundForm({ orderId, totalCents, currency, isOwner }: { orderId: number; totalCents: number; currency: string; isOwner: boolean }) {
+export function RefundForm({
+  orderId,
+  totalCents,
+  currency,
+  isOwner,
+  cash,
+}: {
+  orderId: number;
+  totalCents: number;
+  currency: string;
+  isOwner: boolean;
+  /** Cash-on-delivery order: the refund is handed back in cash and only recorded here. */
+  cash: boolean;
+}) {
   const [state, action, pending] = useActionState<FormState, FormData>(refundOrderAction, {});
   if (!isOwner) return <p className="adm-help">Only the store owner can issue refunds.</p>;
+  const amount = formatMoney(totalCents, currency);
   return (
     <form
       action={action}
       onSubmit={(e) => {
-        if (!window.confirm(`Refund ${formatMoney(totalCents, currency)} to the customer's card? This cannot be undone.`)) e.preventDefault();
+        const question = cash
+          ? `Record that ${amount} was refunded to the customer in cash? This cannot be undone.`
+          : `Refund ${amount} to the customer's card through Tap? This cannot be undone.`;
+        if (!window.confirm(question)) e.preventDefault();
       }}
     >
+      {cash && <p className="adm-help" style={{ marginBottom: 10 }}>Paid in cash — hand the money back, then record the refund here.</p>}
       <input type="hidden" name="id" value={orderId} />
       {state.message && (
         <div style={{ marginBottom: 12 }}>

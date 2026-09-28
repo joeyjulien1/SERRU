@@ -19,10 +19,11 @@ export const metadata: Metadata = { title: 'Settings' };
 export default async function SettingsPage() {
   const admin = await requireAdminPage();
   const isOwner = admin.role === 'owner';
-  const settings = getSettings();
+  const settings = await getSettings();
   const mode = paymentMode();
-  const admins = isOwner ? listAdmins() : [];
-  const heroImage = settings.hero_media_id ? getMedia(Number(settings.hero_media_id)) : null;
+  const tapKey = process.env.TAP_SECRET_KEY ?? '';
+  const admins = isOwner ? await listAdmins() : [];
+  const heroImage = settings.hero_media_id ? await getMedia(Number(settings.hero_media_id)) : null;
   const values: Record<string, string> = {
     ...settings,
     shipping_flat: centsToInput(Number(settings.shipping_flat_cents)),
@@ -42,41 +43,38 @@ export default async function SettingsPage() {
       <div className="adm-grid adm-grid--2" style={{ marginTop: 16 }}>
         <section className="adm-card">
           <div className="adm-card__head">
-            <h2 className="adm-card__title">Card payments</h2>
-            <span className={`status ${mode === 'stripe' ? 'status--active' : mode === 'test' ? 'status--pending' : 'status--failed'}`}>
-              {mode === 'stripe' ? 'Stripe connected' : mode === 'test' ? 'Test mode' : 'Off'}
+            <h2 className="adm-card__title">Card payments — Tap</h2>
+            <span className={`status ${mode === 'tap' ? 'status--active' : mode === 'test' ? 'status--pending' : 'status--failed'}`}>
+              {mode === 'tap' ? (tapKey.startsWith('sk_live') ? 'Live' : 'Tap test keys') : mode === 'test' ? 'Test mode' : 'Off'}
             </span>
           </div>
           <div className="adm-card__body adm-help" style={{ display: 'grid', gap: 10 }}>
-            {mode === 'stripe' ? (
+            {mode === 'tap' ? (
               <p>
-                Visa and Mastercard payments are processed by Stripe. Keys starting with <span className="adm-code">sk_test_</span> are
-                test keys; switch to <span className="adm-code">sk_live_</span> keys to take real payments.
+                Visa and Mastercard payments are processed by Tap Payments on Tap&apos;s secure page. Keys starting with{' '}
+                <span className="adm-code">sk_test_</span> are sandbox keys; switch to <span className="adm-code">sk_live_</span> to
+                take real payments.
               </p>
             ) : (
               <p>
-                Customers can only pay with test cards right now. To accept real Visa / Mastercard payments, add these to the server
-                environment (<span className="adm-code">.env.local</span>) and restart:
+                Customers can only pay with test cards right now{mode === 'disabled' ? ' (card payments are off on the live site)' : ''}.
+                To accept real Visa / Mastercard payments, add your Tap secret key to the server environment (
+                <span className="adm-code">.env.local</span>) and restart:
               </p>
             )}
             <div className="adm-dl">
               <div>
-                <dt>STRIPE_SECRET_KEY</dt>
-                <dd>{process.env.STRIPE_SECRET_KEY ? (process.env.STRIPE_SECRET_KEY.startsWith('sk_live') ? 'live key set' : 'test key set') : 'not set'}</dd>
+                <dt>TAP_SECRET_KEY</dt>
+                <dd>{tapKey ? (tapKey.startsWith('sk_live') ? 'live key set' : 'test key set') : 'not set'}</dd>
               </div>
               <div>
-                <dt>STRIPE_PUBLISHABLE_KEY</dt>
-                <dd>{process.env.STRIPE_PUBLISHABLE_KEY ? 'set' : 'not set'}</dd>
-              </div>
-              <div>
-                <dt>STRIPE_WEBHOOK_SECRET</dt>
-                <dd>{process.env.STRIPE_WEBHOOK_SECRET ? 'set' : 'not set'}</dd>
+                <dt>Cash on delivery</dt>
+                <dd>{settings.cod_enabled === '1' ? 'on' : 'off'}</dd>
               </div>
             </div>
             <p>
-              Webhook endpoint for Stripe: <span className="adm-code">{storeUrl()}/api/stripe/webhook</span>
-              <br />
-              Events: payment_intent.succeeded, payment_intent.payment_failed, payment_intent.canceled, charge.refunded
+              Payment updates reach the store at <span className="adm-code">{storeUrl()}/api/tap/webhook</span> (sent automatically
+              with every charge once the site runs on HTTPS).
             </p>
           </div>
         </section>

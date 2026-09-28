@@ -18,8 +18,12 @@ export type MediaRow = { id: number; file: string; thumb: string; width: number;
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 const ACCEPTED_FORMATS = new Set(['jpeg', 'png', 'webp', 'avif', 'gif', 'tiff', 'heif']);
 
+/** Uploads live in Vercel Blob when BLOB_READ_WRITE_TOKEN is set (production), otherwise in storage/uploads. */
+const blobEnabled = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+
+/** `file` is a full Blob URL for cloud uploads, or a path inside storage/uploads for local ones. */
 export function mediaUrl(file: string): string {
-  return '/media/' + file;
+  return /^https?:\/\//.test(file) ? file : '/media/' + file;
 }
 
 export function mapMedia(row: MediaRow): Media {
@@ -33,8 +37,8 @@ export function mapMedia(row: MediaRow): Media {
   };
 }
 
-export function getMedia(id: number): Media | null {
-  const row = get<MediaRow>('SELECT id, file, thumb, width, height, alt FROM media WHERE id = ?', id);
+export async function getMedia(id: number): Promise<Media | null> {
+  const row = await get<MediaRow>('SELECT id, file, thumb, width, height, alt FROM media WHERE id = ?', id);
   return row ? mapMedia(row) : null;
 }
 
@@ -57,8 +61,6 @@ export async function saveUpload(input: Buffer, alt = ''): Promise<Media> {
   const now = new Date();
   const sub = `${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
   const name = crypto.randomBytes(12).toString('hex');
-  const dir = path.join(uploadsDir(), sub);
-  await fs.mkdir(dir, { recursive: true });
 
   const large = await sharp(input)
     .rotate()
@@ -71,12 +73,10 @@ export async function saveUpload(input: Buffer, alt = ''): Promise<Media> {
     .webp({ quality: 78 })
     .toBuffer();
 
-  const file = `${sub}/${name}.webp`;
-  const thumbFile = `${sub}/${name}-t.webp`;
-  await fs.writeFile(path.join(uploadsDir(), file), large.data);
-  await fs.writeFile(path.join(uploadsDir(), thumbFile), thumb);
+  const file = await store(`${sub}/${name}.webp`, large.data);
+  const thumbFile = await store(`${sub}/${name}-t.webp`, thumb);
 
-  const { lastId } = run(
+  const { lastId } = await run(
     'INSERT INTO media (file, thumb, width, height, alt) VALUES (?, ?, ?, ?, ?)',
     file,
     thumbFile,
@@ -85,6 +85,25 @@ export async function saveUpload(input: Buffer, alt = ''): Promise<Media> {
     alt.slice(0, 200),
   );
   return mapMedia({ id: lastId, file, thumb: thumbFile, width: large.info.width, height: large.info.height, alt });
+}
+
+/** Saves one WebP rendition and returns the value kept in the media table (see mediaUrl). */
+async function store(file: string, data: Buffer): Promise<string> {
+  if (blobEnabled()) {
+    const { put } = await import('@vercel/blob');
+    const blob = await put(`uploads/${file}`, data, {
+      access: 'public',
+      contentType: 'image/webp',
+      addRandomSuffix: false,
+      // File names are random and never reused, so they can be cached forever.
+      cacheControlMaxAge: 31536000,
+    });
+    return blob.url;
+  }
+  const full = path.join(uploadsDir(), file);
+  await fs.mkdir(path.dirname(full), { recursive: true });
+  await fs.writeFile(full, data);
+  return file;
 }
 
 /** Resolves a /media/... request path to a file inside the uploads directory, or null if unsafe. */

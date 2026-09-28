@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: 'Pages' };
 
 export default async function PagesPage(props: PageProps<'/admin/pages'>) {
   const { deleted } = (await props.searchParams) as { deleted?: string };
-  const pages = listPages();
+  const pages = await listPages();
   return (
     <>
       <PageHead

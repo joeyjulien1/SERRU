@@ -21,6 +21,7 @@ function stepIndex(order: Order): number {
 export function OrderView({ order, items }: { order: Order; items: OrderItem[] }) {
   const money = (c: number) => formatMoney(c, order.currency);
   const current = stepIndex(order);
+  const codDue = order.paymentProvider === 'cod' && order.paymentStatus === 'pending';
   return (
     <div className="panel-grid">
       <div className="panel">
@@ -32,12 +33,12 @@ export function OrderView({ order, items }: { order: Order; items: OrderItem[] }
             <span className="small muted">Placed {formatDate(order.createdAt, true)}</span>
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-            <StatusPill value={order.paymentStatus} />
+            <StatusPill value={order.paymentStatus} label={codDue ? 'cash on delivery' : undefined} />
             <StatusPill value={order.fulfillmentStatus} />
           </div>
         </div>
 
-        {order.paymentStatus === 'paid' && order.fulfillmentStatus !== 'cancelled' && (
+        {(order.paymentStatus === 'paid' || codDue) && order.fulfillmentStatus !== 'cancelled' && (
           <ol
             aria-label="Order progress"
             style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, margin: '0 0 20px', padding: 0, listStyle: 'none' }}

@@ -6,13 +6,13 @@ import { getPage, parseBlocks } from '@/lib/pages';
 
 export async function generateMetadata(props: PageProps<'/pages/[slug]'>): Promise<Metadata> {
   const { slug } = await props.params;
-  const page = getPage(slug);
+  const page = await getPage(slug);
   return { title: page?.title ?? 'Not found' };
 }
 
 export default async function ContentPage(props: PageProps<'/pages/[slug]'>) {
   const { slug } = await props.params;
-  const page = getPage(slug);
+  const page = await getPage(slug);
   if (!page) notFound();
   const blocks = parseBlocks(page.body);
   return (

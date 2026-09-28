@@ -38,6 +38,6 @@ export function Alert({ tone, children }: { tone: 'error' | 'success' | 'info' |
   );
 }
 
-export function StatusPill({ value }: { value: string }) {
-  return <span className={`status status--${value}`}>{value.replace(/_/g, ' ')}</span>;
+export function StatusPill({ value, label }: { value: string; label?: string }) {
+  return <span className={`status status--${value}`}>{label ?? value.replace(/_/g, ' ')}</span>;
 }

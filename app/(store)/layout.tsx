@@ -5,8 +5,8 @@ import './store.css';
 // Catalog, prices and stock come from the database — always render fresh.
 export const dynamic = 'force-dynamic';
 
-export default function StoreLayout({ children }: { children: React.ReactNode }) {
-  const settings = getSettings();
+export default async function StoreLayout({ children }: { children: React.ReactNode }) {
+  const settings = await getSettings();
   return (
     <CartProvider currency={settings.currency} shipping={shippingRules(settings)}>
       {children}

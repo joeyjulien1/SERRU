@@ -40,7 +40,7 @@ export async function loginAction(_: FormState, data: FormData): Promise<FormSta
   const ip = await clientIp();
   if (!rateLimit(`login:${ip}:${parsed.data.email}`, 10, 15 * 60_000)) return { ...TOO_MANY, values };
 
-  const row = get<{ id: number; password_hash: string }>('SELECT id, password_hash FROM customers WHERE email = ?', parsed.data.email);
+  const row = await get<{ id: number; password_hash: string }>('SELECT id, password_hash FROM customers WHERE email = ?', parsed.data.email);
   const valid = await verifyPassword(parsed.data.password, row?.password_hash ?? (await dummyPasswordHash()));
   if (!row || !valid) return { ok: false, message: 'Incorrect email or password.', values };
 
@@ -70,7 +70,7 @@ export async function registerAction(_: FormState, data: FormData): Promise<Form
   const ip = await clientIp();
   if (!rateLimit(`register:${ip}`, 8, 60 * 60_000)) return { ...TOO_MANY, values };
 
-  const exists = get<{ id: number }>('SELECT id FROM customers WHERE email = ?', parsed.data.email);
+  const exists = await get<{ id: number }>('SELECT id FROM customers WHERE email = ?', parsed.data.email);
   if (exists) {
     return {
       ok: false,
@@ -80,7 +80,7 @@ export async function registerAction(_: FormState, data: FormData): Promise<Form
   }
 
   const hash = await hashPassword(parsed.data.password);
-  const { lastId } = run(
+  const { lastId } = await run(
     'INSERT INTO customers (email, password_hash, first_name, last_name, accepts_marketing) VALUES (?, ?, ?, ?, ?)',
     parsed.data.email,
     hash,
@@ -89,8 +89,8 @@ export async function registerAction(_: FormState, data: FormData): Promise<Form
     parsed.data.marketing ? 1 : 0,
   );
   // Link earlier guest orders placed with the same email.
-  run('UPDATE orders SET customer_id = ? WHERE customer_id IS NULL AND email = ? COLLATE NOCASE', lastId, parsed.data.email);
-  if (parsed.data.marketing) run('INSERT OR IGNORE INTO subscribers (email) VALUES (?)', parsed.data.email);
+  await run('UPDATE orders SET customer_id = ? WHERE customer_id IS NULL AND email = ? COLLATE NOCASE', lastId, parsed.data.email);
+  if (parsed.data.marketing) await run('INSERT OR IGNORE INTO subscribers (email) VALUES (?)', parsed.data.email);
 
   await createSession('customer', lastId);
   redirect(safeNextPath(data.get('next'), '/account'));
@@ -108,12 +108,12 @@ export async function forgotPasswordAction(_: FormState, data: FormData): Promis
   const ip = await clientIp();
   if (!rateLimit(`forgot:${ip}`, 5, 60 * 60_000)) return TOO_MANY;
 
-  const customer = get<{ id: number; first_name: string }>('SELECT id, first_name FROM customers WHERE email = ?', parsed.data);
+  const customer = await get<{ id: number; first_name: string }>('SELECT id, first_name FROM customers WHERE email = ?', parsed.data);
   if (customer) {
     const token = crypto.randomBytes(32).toString('base64url');
-    run('DELETE FROM password_resets WHERE customer_id = ? OR expires_at < ?', customer.id, Date.now());
-    run('INSERT INTO password_resets (token_hash, customer_id, expires_at) VALUES (?, ?, ?)', hashToken(token), customer.id, Date.now() + 60 * 60_000);
-    const settings = getSettings();
+    await run('DELETE FROM password_resets WHERE customer_id = ? OR expires_at < ?', customer.id, Date.now());
+    await run('INSERT INTO password_resets (token_hash, customer_id, expires_at) VALUES (?, ?, ?)', hashToken(token), customer.id, Date.now() + 60 * 60_000);
+    const settings = await getSettings();
     await sendMail({
       to: parsed.data,
       subject: `Reset your ${settings.store_name} password`,
@@ -132,7 +132,7 @@ export async function resetPasswordAction(_: FormState, data: FormData): Promise
     .safeParse({ password: data.get('password'), confirm: data.get('confirm') });
   if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error) };
 
-  const row = get<{ customer_id: number; expires_at: number; used: number }>(
+  const row = await get<{ customer_id: number; expires_at: number; used: number }>(
     'SELECT customer_id, expires_at, used FROM password_resets WHERE token_hash = ?',
     hashToken(token),
   );
@@ -140,9 +140,9 @@ export async function resetPasswordAction(_: FormState, data: FormData): Promise
     return { ok: false, message: 'This reset link is invalid or has expired. Please request a new one.' };
   }
   const hash = await hashPassword(parsed.data.password);
-  tx(() => {
-    run('UPDATE customers SET password_hash = ? WHERE id = ?', hash, row.customer_id);
-    run('UPDATE password_resets SET used = 1 WHERE customer_id = ?', row.customer_id);
+  await tx(async () => {
+    await run('UPDATE customers SET password_hash = ? WHERE id = ?', hash, row.customer_id);
+    await run('UPDATE password_resets SET used = 1 WHERE customer_id = ?', row.customer_id);
   });
   await destroyAllSessions('customer', row.customer_id);
   await createSession('customer', row.customer_id);
@@ -166,7 +166,7 @@ export async function updateProfileAction(_: FormState, data: FormData): Promise
       marketing: data.get('marketing') === 'on',
     });
   if (!parsed.success) return { ok: false, errors: fieldErrors(parsed.error), values: formValues(data) };
-  run(
+  await run(
     'UPDATE customers SET first_name = ?, last_name = ?, phone = ?, accepts_marketing = ? WHERE id = ?',
     parsed.data.firstName,
     parsed.data.lastName,
@@ -174,7 +174,7 @@ export async function updateProfileAction(_: FormState, data: FormData): Promise
     parsed.data.marketing ? 1 : 0,
     customer.id,
   );
-  if (parsed.data.marketing) run('INSERT OR IGNORE INTO subscribers (email) VALUES (?)', customer.email);
+  if (parsed.data.marketing) await run('INSERT OR IGNORE INTO subscribers (email) VALUES (?)', customer.email);
   refresh();
   return { ok: true, message: 'Your details were saved.' };
 }
@@ -190,11 +190,11 @@ export async function changePasswordAction(_: FormState, data: FormData): Promis
   const ip = await clientIp();
   if (!rateLimit(`chpw:${ip}:${customer.id}`, 8, 15 * 60_000)) return TOO_MANY;
 
-  const row = get<{ password_hash: string }>('SELECT password_hash FROM customers WHERE id = ?', customer.id);
+  const row = await get<{ password_hash: string }>('SELECT password_hash FROM customers WHERE id = ?', customer.id);
   if (!row || !(await verifyPassword(parsed.data.current, row.password_hash))) {
     return { ok: false, errors: { current: 'Current password is incorrect' } };
   }
-  run('UPDATE customers SET password_hash = ? WHERE id = ?', await hashPassword(parsed.data.password), customer.id);
+  await run('UPDATE customers SET password_hash = ? WHERE id = ?', await hashPassword(parsed.data.password), customer.id);
   await destroyAllSessions('customer', customer.id, true);
   return { ok: true, message: 'Password updated. Other devices were signed out.' };
 }
@@ -206,7 +206,7 @@ export async function subscribeAction(_: FormState, data: FormData): Promise<For
   if (!parsed.success) return { ok: false, message: 'Enter a valid email address.', values: formValues(data) };
   const ip = await clientIp();
   if (!rateLimit(`sub:${ip}`, 10, 60 * 60_000)) return TOO_MANY;
-  run('INSERT OR IGNORE INTO subscribers (email) VALUES (?)', parsed.data);
+  await run('INSERT OR IGNORE INTO subscribers (email) VALUES (?)', parsed.data);
   return { ok: true, message: "You're on the list. We'll write when new pieces land." };
 }
 
@@ -235,7 +235,7 @@ export async function contactAction(_: FormState, data: FormData): Promise<FormS
   if (!rateLimit(`contact:${ip}`, 5, 60 * 60_000)) return { ...TOO_MANY, values };
 
   const m = parsed.data;
-  run('INSERT INTO messages (name, email, phone, subject, body) VALUES (?, ?, ?, ?, ?)', m.name, m.email, m.phone, m.subject, m.body);
+  await run('INSERT INTO messages (name, email, phone, subject, body) VALUES (?, ?, ?, ?, ?)', m.name, m.email, m.phone, m.subject, m.body);
   const notify = notifyAddress();
   if (notify) {
     await sendMail({

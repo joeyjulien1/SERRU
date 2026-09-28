@@ -16,7 +16,7 @@ export default async function AccountPage(props: PageProps<'/account'>) {
   const customer = await getCurrentCustomer();
   if (!customer) redirect('/account/login');
   const { reset } = (await props.searchParams) as { reset?: string };
-  const orders = listCustomerOrders(customer.id);
+  const orders = await listCustomerOrders(customer.id);
   const address = customer.defaultAddress;
 
   return (
@@ -58,7 +58,7 @@ export default async function AccountPage(props: PageProps<'/account'>) {
                       <span className="small muted">
                         {formatDate(o.createdAt)} · {pluralize(o.itemCount, 'item')}
                       </span>
-                      <StatusPill value={o.paymentStatus} />
+                      <StatusPill value={o.paymentStatus} label={o.paymentProvider === 'cod' && o.paymentStatus === 'pending' ? 'cash on delivery' : undefined} />
                       <StatusPill value={o.fulfillmentStatus} />
                     </span>
                   </Link>

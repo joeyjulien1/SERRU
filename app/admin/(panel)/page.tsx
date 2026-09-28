@@ -8,7 +8,7 @@ import { requireAdminPage } from '@/lib/admin-auth';
 import { dashboardStats, lowStock, revenueByDay, topProducts } from '@/lib/admin-data';
 import { sweepStaleOrders } from '@/lib/checkout';
 import { formatDate, formatMoney, orderLabel } from '@/lib/format';
-import { listOrders } from '@/lib/orders';
+import { codDue, listOrders } from '@/lib/orders';
 import { paymentMode } from '@/lib/payments';
 import { getSettings } from '@/lib/settings';
 
@@ -29,13 +29,16 @@ function Delta({ now, prev }: { now: number; prev: number }) {
 export default async function DashboardPage() {
   const admin = await requireAdminPage();
   await sweepStaleOrders();
-  const settings = getSettings();
+  const [settings, stats, cod, series, recent, top, low] = await Promise.all([
+    getSettings(),
+    dashboardStats(),
+    codDue(),
+    revenueByDay(30),
+    listOrders({ limit: 6 }).then((r) => r.items),
+    topProducts(),
+    lowStock(),
+  ]);
   const currency = settings.currency;
-  const stats = dashboardStats();
-  const series = revenueByDay(30);
-  const recent = listOrders({ limit: 6 }).items;
-  const top = topProducts();
-  const low = lowStock();
   const mode = paymentMode();
   const aov = stats.orders30 ? Math.round(stats.revenue30 / stats.orders30) : 0;
 
@@ -51,17 +54,18 @@ export default async function DashboardPage() {
         }
       />
 
-      {mode !== 'stripe' && (
+      {mode !== 'tap' && (
         <div style={{ marginBottom: 16 }}>
           <Alert tone="warning">
             {mode === 'test' ? (
               <>
-                <strong>Payments are in test mode.</strong> Customers can only pay with test cards. Add your Stripe keys to{' '}
+                <strong>Card payments are in test mode.</strong> Customers can only pay with test cards. Add your Tap secret key to{' '}
                 <span className="adm-code">.env.local</span> to accept real Visa and Mastercard payments.
               </>
             ) : (
               <>
-                <strong>Card payments are switched off.</strong> Add your Stripe keys to the server environment to open checkout.
+                <strong>Card payments are switched off.</strong> Add your Tap secret key to the server environment to accept cards
+                {settings.cod_enabled === '1' ? ' — cash on delivery still works.' : '.'}
               </>
             )}
           </Alert>
@@ -90,13 +94,13 @@ export default async function DashboardPage() {
           <span className="adm-kpi__value">{formatMoney(aov, currency)}</span>
           <span className="adm-kpi__sub">Refunded: {formatMoney(stats.refunds30, currency)}</span>
         </div>
-        <Link href="/orders?fulfillment=unfulfilled&payment=paid" className="adm-card adm-kpi">
+        <Link href="/orders?view=to-fulfil" className="adm-card adm-kpi">
           <span className="adm-kpi__label">
             <Icon name="truck" size={16} /> To fulfil
           </span>
           <span className="adm-kpi__value">{stats.toFulfil}</span>
           <span className="adm-kpi__sub">
-            {stats.customers} customers · {stats.newCustomers30} new
+            {cod.count > 0 ? `Cash to collect: ${formatMoney(cod.cents, currency)}` : `${stats.customers} customers · ${stats.newCustomers30} new`}
           </span>
         </Link>
       </div>
@@ -148,7 +152,7 @@ export default async function DashboardPage() {
                           </td>
                           <td>{o.shipName}</td>
                           <td>
-                            <StatusPill value={o.paymentStatus} />
+                            <StatusPill value={o.paymentStatus} label={o.paymentProvider === 'cod' && o.paymentStatus === 'pending' ? 'cash due' : undefined} />
                           </td>
                           <td>
                             <StatusPill value={o.fulfillmentStatus} />

@@ -12,7 +12,7 @@ import { getSettings } from '@/lib/settings';
 
 export async function generateMetadata(props: PageProps<'/products/[slug]'>): Promise<Metadata> {
   const { slug } = await props.params;
-  const product = getProductBySlug(slug);
+  const product = await getProductBySlug(slug);
   if (!product) return { title: 'Not found' };
   const description = product.description.slice(0, 160);
   return {
@@ -29,10 +29,10 @@ export async function generateMetadata(props: PageProps<'/products/[slug]'>): Pr
 
 export default async function ProductPage(props: PageProps<'/products/[slug]'>) {
   const { slug } = await props.params;
-  const product = getProductBySlug(slug);
+  const product = await getProductBySlug(slug);
   if (!product) notFound();
-  const settings = getSettings();
-  const related = relatedProducts(product);
+  const settings = await getSettings();
+  const related = await relatedProducts(product);
   const shippingNote =
     Number(settings.free_shipping_threshold_cents) > 0
       ? `Complimentary delivery on orders over ${formatMoney(Number(settings.free_shipping_threshold_cents), settings.currency)}.`

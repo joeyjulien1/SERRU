@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 export default async function ContactPage(props: PageProps<'/contact'>) {
   const { subject } = (await props.searchParams) as { subject?: string };
-  const settings = getSettings();
+  const settings = await getSettings();
   const customer = await getCurrentCustomer();
   return (
     <div className="container">

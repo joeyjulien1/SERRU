@@ -1,6 +1,7 @@
 // Formatting helpers shared by server and client code.
 
-export const CURRENCIES = ['USD', 'EUR', 'GBP', 'AED', 'SAR', 'QAR', 'CAD', 'AUD'] as const;
+// Currencies Tap Payments supports with two decimal places (prices are stored in cents).
+export const CURRENCIES = ['USD', 'EUR', 'GBP', 'AED', 'SAR', 'QAR'] as const;
 export type Currency = (typeof CURRENCIES)[number];
 
 export function formatMoney(cents: number, currency: string = 'USD'): string {

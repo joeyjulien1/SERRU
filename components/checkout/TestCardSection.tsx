@@ -67,9 +67,6 @@ export function TestCardSection({ ref }: { ref: Ref<PaymentHandle> }) {
         if (Object.keys(next).length) return { ok: false, message: 'Please check your card details.' };
         return { ok: true, extra: { testCard: { last4: digits.slice(-4), brand: brand || 'card' } } };
       },
-      async complete() {
-        return { ok: true, status: 'succeeded' };
-      },
     }),
     [digits, expiry, cvc, name, brand],
   );
@@ -80,7 +77,7 @@ export function TestCardSection({ ref }: { ref: Ref<PaymentHandle> }) {
         <Icon name="info" size={18} />
         <span>
           <strong>Test mode — no real charges.</strong> Use <code>4242 4242 4242 4242</code> with any future date and any CVC. To
-          test a decline use <code>4000 0000 0000 0002</code>. Add your Stripe keys to accept real cards.
+          test a decline use <code>4000 0000 0000 0002</code>. Add your Tap keys to accept real cards.
         </span>
       </div>
       <div className="field">

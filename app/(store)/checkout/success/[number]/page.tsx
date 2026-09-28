@@ -5,9 +5,9 @@ import { ClearCart } from '@/components/checkout/ClearCart';
 import { Icon } from '@/components/Icon';
 import { OrderView } from '@/components/store/OrderView';
 import { Alert } from '@/components/ui';
-import { syncStripeOrder } from '@/lib/checkout';
+import { syncTapOrder } from '@/lib/checkout';
 import { getCurrentCustomer } from '@/lib/customers';
-import { orderLabel } from '@/lib/format';
+import { formatMoney, orderLabel } from '@/lib/format';
 import { getOrderByNumber, getOrderItems, tokenMatches } from '@/lib/orders';
 
 export const metadata: Metadata = { title: 'Order confirmation', robots: { index: false } };
@@ -15,37 +15,39 @@ export const metadata: Metadata = { title: 'Order confirmation', robots: { index
 export default async function SuccessPage(props: PageProps<'/checkout/success/[number]'>) {
   const { number } = await props.params;
   const { token } = (await props.searchParams) as { token?: string };
-  let order = getOrderByNumber(Number(number));
+  let order = await getOrderByNumber(Number(number));
   if (!order) notFound();
   const customer = await getCurrentCustomer();
   const allowed = tokenMatches(order, token) || (customer && order.customerId === customer.id);
   if (!allowed) notFound();
 
-  if (order.paymentProvider === 'stripe' && order.paymentStatus === 'pending') {
+  if (order.paymentProvider === 'tap' && order.paymentStatus === 'pending') {
     try {
-      order = await syncStripeOrder(order);
+      order = await syncTapOrder(order);
     } catch (err) {
       console.error('[success] could not sync order', err);
     }
   }
 
-  const items = getOrderItems(order.id);
+  const items = await getOrderItems(order.id);
   const firstName = order.shipName.split(' ')[0];
+  const cod = order.paymentProvider === 'cod' && order.paymentStatus === 'pending';
   const paid = order.paymentStatus === 'paid';
-  const pending = order.paymentStatus === 'pending';
+  const confirmed = paid || cod;
+  const pending = order.paymentStatus === 'pending' && !cod;
 
   return (
     <div className="container container--narrow">
       <div className="thanks">
-        {paid && <ClearCart />}
+        {confirmed && <ClearCart />}
         <div className="thanks__head">
           <span className="thanks__check" aria-hidden="true">
-            <Icon name={paid ? 'check' : pending ? 'refresh' : 'alert'} size={26} strokeWidth={2} />
+            <Icon name={confirmed ? 'check' : pending ? 'refresh' : 'alert'} size={26} strokeWidth={2} />
           </span>
           <div>
             <p className="small muted">Order {orderLabel(order.number)}</p>
             <h1 className="h2">
-              {paid ? `Thank you, ${firstName}!` : pending ? 'Payment processing' : 'Payment not completed'}
+              {confirmed ? `Thank you, ${firstName}!` : pending ? 'Payment processing' : 'Payment not completed'}
             </h1>
           </div>
         </div>
@@ -56,13 +58,23 @@ export default async function SuccessPage(props: PageProps<'/checkout/success/[n
             when it ships.
           </Alert>
         )}
-        {pending && (
-          <Alert tone="info">
-            Your bank is still confirming this payment. This page updates when you refresh it, and we&apos;ll email you as soon as
-            it&apos;s confirmed.
+        {cod && (
+          <Alert tone="success">
+            Your order is confirmed — you&apos;ll pay <strong>{formatMoney(order.totalCents, order.currency)}</strong> in cash on
+            delivery. A confirmation has been sent to <strong>{order.email}</strong>.
           </Alert>
         )}
-        {!paid && !pending && (
+        {pending && (
+          <Alert tone="info">
+            We haven&apos;t received the payment confirmation yet. If you completed the payment, refresh this page in a moment —
+            we&apos;ll also email you as soon as it&apos;s confirmed. If you closed the payment page, your cart is still saved:{' '}
+            <Link href="/checkout" className="link">
+              return to checkout
+            </Link>
+            .
+          </Alert>
+        )}
+        {!confirmed && !pending && (
           <Alert tone="error">
             This payment was not completed and you have not been charged. Your cart is still saved —{' '}
             <Link href="/checkout" className="link">

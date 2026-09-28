@@ -1,7 +1,5 @@
 'use client';
 
-import { Elements } from '@stripe/react-stripe-js';
-import { loadStripe, type Stripe } from '@stripe/stripe-js';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
@@ -10,11 +8,12 @@ import { shippingFor } from '@/lib/shipping';
 import { useCart } from '../cart/CartProvider';
 import { Icon, PaymentMarks } from '../Icon';
 import { Alert } from '../ui';
-import type { Billing, CheckoutResponse, PaymentHandle } from './payment-types';
-import { StripeSection } from './StripeSection';
+import type { PaymentHandle } from './payment-types';
 import { TestCardSection } from './TestCardSection';
 
-type Mode = 'stripe' | 'test' | 'disabled';
+/** tap: Tap's hosted card page · test: built-in test card form (development) · disabled: no card payments. */
+type CardMode = 'tap' | 'test' | 'disabled';
+type Method = 'card' | 'cod';
 type Defaults = {
   email: string;
   firstName: string;
@@ -28,26 +27,20 @@ type Defaults = {
   country: string;
 };
 
-const stripeCache = new Map<string, Promise<Stripe | null>>();
-function getStripe(key: string) {
-  if (!stripeCache.has(key)) stripeCache.set(key, loadStripe(key));
-  return stripeCache.get(key)!;
-}
-
 export function CheckoutClient({
-  mode,
-  publishableKey,
+  cardMode,
+  codEnabled,
   countries,
   signedIn,
   defaults,
 }: {
-  mode: Mode;
-  publishableKey: string;
+  cardMode: CardMode;
+  codEnabled: boolean;
   countries: { code: string; name: string }[];
   signedIn: boolean;
   defaults: Defaults;
 }) {
-  const { items, subtotalCents, currency, shipping, sync } = useCart();
+  const { items, subtotalCents, shipping, sync } = useCart();
   const [synced, setSynced] = useState(false);
 
   useEffect(() => {
@@ -57,9 +50,6 @@ export function CheckoutClient({
       alive = false;
     };
   }, [sync]);
-
-  const shippingCents = shippingFor(subtotalCents, shipping);
-  const totalCents = subtotalCents + shippingCents;
 
   if (!synced) {
     return (
@@ -81,55 +71,31 @@ export function CheckoutClient({
     );
   }
 
-  const form = (
+  const shippingCents = shippingFor(subtotalCents, shipping);
+  return (
     <CheckoutForm
-      mode={mode}
+      cardMode={cardMode}
+      codEnabled={codEnabled}
       countries={countries}
       signedIn={signedIn}
       defaults={defaults}
-      totalCents={totalCents}
+      totalCents={subtotalCents + shippingCents}
       shippingCents={shippingCents}
     />
   );
-
-  if (mode === 'stripe' && publishableKey) {
-    return (
-      <Elements
-        stripe={getStripe(publishableKey)}
-        options={{
-          mode: 'payment',
-          amount: Math.max(totalCents, 50),
-          currency: currency.toLowerCase(),
-          paymentMethodTypes: ['card'],
-          appearance: {
-            theme: 'stripe',
-            variables: {
-              colorPrimary: '#184a46',
-              colorText: '#0e1b1a',
-              colorDanger: '#b3261e',
-              fontFamily: 'Jost, system-ui, sans-serif',
-              borderRadius: '6px',
-            },
-          },
-          fonts: [{ cssSrc: 'https://fonts.googleapis.com/css2?family=Jost:wght@400;500&display=swap' }],
-        }}
-      >
-        {form}
-      </Elements>
-    );
-  }
-  return form;
 }
 
 function CheckoutForm({
-  mode,
+  cardMode,
+  codEnabled,
   countries,
   signedIn,
   defaults,
   totalCents,
   shippingCents,
 }: {
-  mode: Mode;
+  cardMode: CardMode;
+  codEnabled: boolean;
   countries: { code: string; name: string }[];
   signedIn: boolean;
   defaults: Defaults;
@@ -138,16 +104,19 @@ function CheckoutForm({
 }) {
   const router = useRouter();
   const { items, subtotalCents, currency, sync, notices } = useCart();
-  const payment = useRef<PaymentHandle>(null);
+  const testCard = useRef<PaymentHandle>(null);
+  const cardAvailable = cardMode !== 'disabled';
+  const [method, setMethod] = useState<Method>(cardAvailable ? 'card' : 'cod');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [fields, setFields] = useState<Record<string, string>>({});
   const [summaryOpen, setSummaryOpen] = useState(false);
   const money = (c: number) => formatMoney(c, currency);
+  const canPay = (method === 'card' && cardAvailable) || (method === 'cod' && codEnabled);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (busy || mode === 'disabled') return;
+    if (busy || !canPay) return;
     setError('');
     const fd = new FormData(e.currentTarget);
     const val = (k: string) => String(fd.get(k) ?? '').trim();
@@ -170,13 +139,18 @@ function CheckoutForm({
       return;
     }
 
+    const provider = method === 'cod' ? 'cod' : cardMode;
     setBusy(true);
     let navigating = false;
     try {
-      const prep = await payment.current?.prepare();
-      if (!prep || !prep.ok) {
-        setError(prep && !prep.ok ? prep.message : 'Payment form is not ready.');
-        return;
+      let extra: Record<string, unknown> = {};
+      if (provider === 'test') {
+        const prep = await testCard.current?.prepare();
+        if (!prep || !prep.ok) {
+          setError(prep && !prep.ok ? prep.message : 'The card form is not ready.');
+          return;
+        }
+        extra = prep.extra ?? {};
       }
 
       const res = await fetch('/api/checkout', {
@@ -197,58 +171,32 @@ function CheckoutForm({
           phone: val('phone'),
           notes: val('notes'),
           saveInfo: fd.get('saveInfo') === 'on',
-          provider: mode,
-          ...(prep.extra ?? {}),
+          provider,
+          ...extra,
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as Partial<CheckoutResponse> & {
+      const data = (await res.json().catch(() => ({}))) as {
+        next?: string;
         error?: string;
         fields?: Record<string, string>;
         problems?: unknown[];
       };
 
-      if (!res.ok || !data.number || !data.token) {
+      if (!res.ok || !data.next) {
         if (data.fields) setFields(data.fields);
         if (data.problems) await sync();
         setError(data.error ?? 'Something went wrong. Please try again.');
         return;
       }
-      const order = data as CheckoutResponse;
-
-      if (mode === 'stripe') {
-        const billing: Billing = {
-          name: `${val('firstName')} ${val('lastName')}`.trim(),
-          email: val('email'),
-          phone: val('phone'),
-          address: {
-            line1: val('address1'),
-            line2: val('address2'),
-            city: val('city'),
-            state: val('region'),
-            postal_code: val('postal'),
-            country: val('country'),
-          },
-        };
-        const done = await payment.current!.complete(order, billing);
-        if (!done.ok) {
-          await fetch('/api/checkout/status', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ number: order.number, token: order.token, action: 'abandon', message: done.message }),
-          }).catch(() => undefined);
-          setError(done.message);
-          return;
-        }
-        await fetch('/api/checkout/status', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ number: order.number, token: order.token, action: 'confirm' }),
-        }).catch(() => undefined);
-      }
 
       // Keep the button disabled while navigating away so the order can't be submitted twice.
       navigating = true;
-      router.push(`/checkout/success/${order.number}?token=${encodeURIComponent(order.token)}`);
+      if (provider === 'tap') {
+        // Tap's secure card page (an external site); it sends the customer back to /checkout/return/…
+        window.location.assign(data.next);
+      } else {
+        router.push(data.next);
+      }
     } catch {
       setError('Network error. Please check your connection and try again.');
     } finally {
@@ -300,6 +248,17 @@ function CheckoutForm({
       </span>
     ) : null;
   const inv = (k: string) => (fields[k] ? { 'aria-invalid': true as const, 'aria-describedby': `co-${k}-err` } : {});
+
+  const submitLabel =
+    method === 'cod' ? (
+      <>
+        <Icon name="check" size={16} /> Place order · {money(totalCents)}
+      </>
+    ) : (
+      <>
+        <Icon name="lock" size={16} /> Pay {money(totalCents)}
+      </>
+    );
 
   return (
     <div className="checkout">
@@ -456,29 +415,71 @@ function CheckoutForm({
               <h2 id="co-payment-title" className="checkout-section__title">
                 Payment
               </h2>
-              <PaymentMarks height={22} />
             </div>
-            {mode === 'disabled' ? (
+
+            {!cardAvailable && !codEnabled ? (
               <Alert tone="warning">
-                Online card payments are being set up. Please <Link className="link" href="/contact">contact us</Link> to
-                place your order.
+                Online ordering is being set up. Please <Link className="link" href="/contact">contact us</Link> to place your
+                order.
               </Alert>
             ) : (
-              <div className="pay-box">
-                <div className="pay-box__head">
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                    <Icon name="card" size={18} /> Credit or debit card
-                  </span>
-                  <span className="tiny muted">Visa · Mastercard</span>
-                </div>
-                <div className="pay-box__body">
-                  {mode === 'stripe' ? <StripeSection ref={payment} /> : <TestCardSection ref={payment} />}
-                </div>
+              <div className="pay-box" role="radiogroup" aria-labelledby="co-payment-title">
+                {cardAvailable && (
+                  <>
+                    <label className="pay-option" data-selected={method === 'card'}>
+                      <input type="radio" name="method" value="card" checked={method === 'card'} onChange={() => setMethod('card')} />
+                      <span>Credit or debit card</span>
+                      <span className="pay-option__extra">
+                        <PaymentMarks height={20} />
+                      </span>
+                    </label>
+                    {method === 'card' && (
+                      <div className="pay-box__body">
+                        {cardMode === 'tap' ? (
+                          <p className="pay-note">
+                            <Icon name="lock" size={18} />
+                            <span>
+                              After you click <strong>Pay</strong>, you&apos;ll continue to <strong>Tap Payments</strong>&apos; secure page to
+                              enter your Visa or Mastercard details (with 3-D Secure). You&apos;ll come straight back here afterwards.
+                            </span>
+                          </p>
+                        ) : (
+                          <TestCardSection ref={testCard} />
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+                {codEnabled && (
+                  <>
+                    <label className="pay-option" data-selected={method === 'cod'}>
+                      <input type="radio" name="method" value="cod" checked={method === 'cod'} onChange={() => setMethod('cod')} />
+                      <span>Cash on delivery</span>
+                      <span className="pay-option__extra">
+                        <Icon name="truck" size={20} />
+                      </span>
+                    </label>
+                    {method === 'cod' && (
+                      <div className="pay-box__body">
+                        <p className="pay-note">
+                          <Icon name="info" size={18} />
+                          <span>
+                            Pay in cash when your order arrives. Please have <strong>{money(totalCents)}</strong> ready for the
+                            courier.
+                          </span>
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
-            <p className="secure-note">
-              <Icon name="lock" size={14} /> Payments are encrypted and processed securely. We never store your card details.
-            </p>
+            {method === 'card' && cardAvailable && (
+              <p className="secure-note">
+                <Icon name="lock" size={14} /> Card payments are encrypted and processed by Tap Payments. We never see or store your
+                card details.
+              </p>
+            )}
           </section>
 
           {error && (
@@ -487,15 +488,13 @@ function CheckoutForm({
             </div>
           )}
 
-          <button type="submit" className="btn btn--block btn--lg" style={{ marginTop: 24 }} disabled={busy || mode === 'disabled'}>
+          <button type="submit" className="btn btn--block btn--lg" style={{ marginTop: 24 }} disabled={busy || !canPay}>
             {busy ? (
               <>
-                <span className="spinner" aria-hidden="true" /> Processing…
+                <span className="spinner" aria-hidden="true" /> {method === 'card' && cardMode === 'tap' ? 'Opening secure payment…' : 'Processing…'}
               </>
             ) : (
-              <>
-                <Icon name="lock" size={16} /> Pay {money(totalCents)}
-              </>
+              submitLabel
             )}
           </button>
 

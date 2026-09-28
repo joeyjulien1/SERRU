@@ -7,20 +7,20 @@ import { listPages } from '@/lib/pages';
 // Built from the live catalogue on every request.
 export const dynamic = 'force-dynamic';
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = storeUrl();
-  const products = listProducts({ limit: 200 }).items;
+  const [{ items: products }, categories, pages] = await Promise.all([listProducts({ limit: 200 }), listCategories(), listPages()]);
   return [
     { url: `${base}/`, changeFrequency: 'daily', priority: 1 },
     { url: `${base}/shop`, changeFrequency: 'daily', priority: 0.9 },
     { url: `${base}/contact`, changeFrequency: 'yearly', priority: 0.4 },
-    ...listCategories().map((c) => ({ url: `${base}/collections/${c.slug}`, changeFrequency: 'weekly' as const, priority: 0.8 })),
+    ...categories.map((c) => ({ url: `${base}/collections/${c.slug}`, changeFrequency: 'weekly' as const, priority: 0.8 })),
     ...products.map((p) => ({
       url: `${base}/products/${p.slug}`,
       lastModified: parseDbDate(p.updatedAt),
       changeFrequency: 'weekly' as const,
       priority: 0.7,
     })),
-    ...listPages().map((p) => ({ url: `${base}/pages/${p.slug}`, lastModified: parseDbDate(p.updatedAt), priority: 0.3 })),
+    ...pages.map((p) => ({ url: `${base}/pages/${p.slug}`, lastModified: parseDbDate(p.updatedAt), priority: 0.3 })),
   ];
 }

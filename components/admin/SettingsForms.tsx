@@ -101,7 +101,7 @@ export function StoreSettingsForm({
 
         <section className="adm-card">
           <div className="adm-card__head">
-            <h2 className="adm-card__title">Delivery pricing</h2>
+            <h2 className="adm-card__title">Delivery &amp; payment</h2>
           </div>
           <div className="adm-card__body">
             {render({ name: 'shipping_flat', label: 'Delivery fee per order', type: 'money', placeholder: '25', hint: 'Charged at checkout. Use 0 for free delivery on all orders.' })}
@@ -112,6 +112,14 @@ export function StoreSettingsForm({
               placeholder: '500',
               hint: 'Leave empty or 0 to switch off free delivery.',
             })}
+            <input type="hidden" name="cod_enabled_present" value="1" />
+            <label className="adm-switch" style={{ marginTop: 8 }}>
+              <span>
+                <strong>Cash on delivery</strong>
+                <small>Let customers pay in cash when the order arrives</small>
+              </span>
+              <input type="checkbox" name="cod_enabled" defaultChecked={values.cod_enabled === '1'} />
+            </label>
           </div>
         </section>
 

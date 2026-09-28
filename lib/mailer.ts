@@ -7,7 +7,7 @@ export type Mail = { to: string; subject: string; text: string; replyTo?: string
 
 /**
  * Sends email through SMTP when SMTP_HOST is configured; otherwise appends it to
- * storage/outbox.log so nothing is silently lost during development.
+ * storage/outbox.log (or the runtime log on Vercel) so nothing is silently lost.
  * Never throws — a mail failure must not break checkout or sign-up.
  */
 export async function sendMail(mail: Mail): Promise<void> {
@@ -41,7 +41,9 @@ export async function sendMail(mail: Mail): Promise<void> {
     ]
       .filter((l) => l !== null)
       .join('\n');
-    await fs.appendFile(path.join(dataDir(), 'outbox.log'), entry + '\n');
+    // Vercel's file system is read-only: log the email so it shows in the deployment's runtime logs.
+    if (process.env.VERCEL) console.warn('[mail] SMTP is not configured, email not sent:\n' + entry);
+    else await fs.appendFile(path.join(dataDir(), 'outbox.log'), entry + '\n');
   } catch (err) {
     console.error('[mail] failed to send', mail.subject, err);
   }

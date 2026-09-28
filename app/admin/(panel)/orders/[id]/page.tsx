@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { ConfirmButton } from '@/components/admin/ConfirmButton';
 import { FulfillmentForm, RefundForm } from '@/components/admin/OrderForms';
 import { PageHead } from '@/components/admin/parts';
 import { Icon } from '@/components/Icon';
 import { Alert, StatusPill } from '@/components/ui';
+import { markCodPaidAction } from '@/app/admin/actions';
 import { requireAdminPage } from '@/lib/admin-auth';
-import { syncStripeOrder } from '@/lib/checkout';
+import { syncTapOrder } from '@/lib/checkout';
 import { countryName } from '@/lib/countries';
 import { formatDate, formatMoney, orderLabel } from '@/lib/format';
 import { getOrder, getOrderItems, orderTransactions } from '@/lib/orders';
@@ -14,20 +16,23 @@ import { storeUrl } from '@/lib/hosts';
 
 export const metadata: Metadata = { title: 'Order' };
 
+const PROVIDER_LABEL: Record<string, string> = { tap: 'Card · Tap Payments', cod: 'Cash on delivery', test: 'Test mode' };
+
 export default async function OrderPage(props: PageProps<'/admin/orders/[id]'>) {
   const admin = await requireAdminPage();
   const { id } = await props.params;
-  let order = getOrder(Number(id));
+  let order = await getOrder(Number(id));
   if (!order) notFound();
-  if (order.paymentProvider === 'stripe' && order.paymentStatus === 'pending') {
+  if (order.paymentProvider === 'tap' && order.paymentStatus === 'pending') {
     try {
-      order = await syncStripeOrder(order);
+      order = await syncTapOrder(order);
     } catch (err) {
-      console.error('[admin] could not sync order with Stripe', err);
+      console.error('[admin] could not sync order with Tap', err);
     }
   }
-  const items = getOrderItems(order.id);
-  const txs = orderTransactions(order.id);
+  const items = await getOrderItems(order.id);
+  const txs = await orderTransactions(order.id);
+  const codDue = order.paymentProvider === 'cod' && order.paymentStatus === 'pending' && order.fulfillmentStatus !== 'cancelled';
   const money = (c: number) => formatMoney(c, order.currency);
 
   return (
@@ -36,7 +41,7 @@ export default async function OrderPage(props: PageProps<'/admin/orders/[id]'>) 
         back={{ href: '/orders', label: 'Orders' }}
         title={
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            Order {orderLabel(order.number)} <StatusPill value={order.paymentStatus} /> <StatusPill value={order.fulfillmentStatus} />
+            Order {orderLabel(order.number)} <StatusPill value={order.paymentStatus} label={order.paymentProvider === 'cod' && order.paymentStatus === 'pending' ? 'cash due' : undefined} /> <StatusPill value={order.fulfillmentStatus} />
           </span>
         }
         description={`Placed ${formatDate(order.createdAt, true)}${order.paidAt ? ` · paid ${formatDate(order.paidAt, true)}` : ''}`}
@@ -110,7 +115,7 @@ export default async function OrderPage(props: PageProps<'/admin/orders/[id]'>) 
           <section className="adm-card">
             <div className="adm-card__head">
               <h2 className="adm-card__title">Payment</h2>
-              <span className="adm-help">{order.paymentProvider === 'stripe' ? 'Stripe' : 'Test mode'}</span>
+              <span className="adm-help">{PROVIDER_LABEL[order.paymentProvider] ?? order.paymentProvider}</span>
             </div>
             <div className="adm-card__body">
               {txs.length === 0 ? (
@@ -189,12 +194,29 @@ export default async function OrderPage(props: PageProps<'/admin/orders/[id]'>) 
               <h2 className="adm-card__title">Fulfillment</h2>
             </div>
             <div className="adm-card__body">
+              {codDue && (
+                <div style={{ marginBottom: 16 }}>
+                  <Alert tone="warning">
+                    <strong>Cash on delivery.</strong> Collect {formatMoney(order.totalCents, order.currency)} from the customer, then
+                    record it:
+                    <div style={{ marginTop: 10 }}>
+                      <ConfirmButton
+                        action={markCodPaidAction.bind(null, order.id)}
+                        confirmText={`Confirm you received ${formatMoney(order.totalCents, order.currency)} in cash for ${orderLabel(order.number)}?`}
+                        className="btn btn--sm"
+                      >
+                        <Icon name="check" size={14} /> Mark as paid (cash collected)
+                      </ConfirmButton>
+                    </div>
+                  </Alert>
+                </div>
+              )}
               <FulfillmentForm
                 orderId={order.id}
                 status={order.fulfillmentStatus}
                 tracking={order.trackingNumber}
                 note={order.adminNote}
-                paid={order.paymentStatus === 'paid'}
+                canShip={order.paymentStatus === 'paid' || codDue}
               />
             </div>
           </section>
@@ -205,7 +227,13 @@ export default async function OrderPage(props: PageProps<'/admin/orders/[id]'>) 
                 <h2 className="adm-card__title">Refund</h2>
               </div>
               <div className="adm-card__body">
-                <RefundForm orderId={order.id} totalCents={order.totalCents} currency={order.currency} isOwner={admin.role === 'owner'} />
+                <RefundForm
+                  orderId={order.id}
+                  totalCents={order.totalCents}
+                  currency={order.currency}
+                  isOwner={admin.role === 'owner'}
+                  cash={order.paymentProvider === 'cod'}
+                />
               </div>
             </section>
           )}

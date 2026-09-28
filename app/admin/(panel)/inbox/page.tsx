@@ -12,8 +12,8 @@ export const metadata: Metadata = { title: 'Inbox' };
 export default async function InboxPage(props: PageProps<'/admin/inbox'>) {
   const { tab } = (await props.searchParams) as { tab?: string };
   const showSubs = tab === 'subscribers';
-  const messages = listMessages();
-  const subscribers = listSubscribers();
+  const messages = await listMessages();
+  const subscribers = await listSubscribers();
   const unread = messages.filter((m) => !m.isRead).length;
 
   return (

@@ -6,6 +6,30 @@ import { Icon } from '../Icon';
 import { Alert } from '../ui';
 
 const MAX_BYTES = 20 * 1024 * 1024;
+// Hosting platforms cap request bodies (Vercel: 4.5 MB), so bigger photos are shrunk in the browser first.
+// The server still makes the final 2000px WebP, so 2400px here loses nothing.
+const SEND_LIMIT = 4 * 1024 * 1024;
+const SEND_MAX_SIDE = 2400;
+
+async function shrinkForUpload(file: File): Promise<File> {
+  if (file.size <= SEND_LIMIT) return file;
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const scale = Math.min(1, SEND_MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext('2d')?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    for (const quality of [0.9, 0.8, 0.7]) {
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+      if (blob && blob.size <= SEND_LIMIT) return new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' });
+    }
+  } catch {
+    // The browser cannot decode this format — send the original and let the server decide.
+  }
+  return file;
+}
 
 export function MediaUploader({
   value,
@@ -41,10 +65,11 @@ export function MediaUploader({
       setUploading((u) => [...u, file.name]);
       try {
         const body = new FormData();
-        body.append('file', file);
+        body.append('file', await shrinkForUpload(file), file.name);
         const res = await fetch('/api/admin/upload', { method: 'POST', body });
         const data = (await res.json().catch(() => ({}))) as Media & { error?: string };
-        if (!res.ok || !data.id) problems.push(data.error ?? `${file.name} could not be uploaded.`);
+        if (res.status === 413) problems.push(`${file.name} is too large to upload. Save it as a smaller JPG and try again.`);
+        else if (!res.ok || !data.id) problems.push(data.error ?? `${file.name} could not be uploaded.`);
         else onChange((prev) => (multiple ? [...prev, data] : [data]));
       } catch {
         problems.push(`${file.name}: network error.`);

@@ -22,7 +22,7 @@ export const getCurrentAdmin = cache(async (): Promise<Admin | null> => {
   if (!(await onAdminHost())) return null;
   const id = await readSession('admin');
   if (!id) return null;
-  return get<Admin>('SELECT id, email, name, role FROM admins WHERE id = ?', id) ?? null;
+  return (await get<Admin>('SELECT id, email, name, role FROM admins WHERE id = ?', id)) ?? null;
 });
 
 /** For admin pages: redirects to the admin login when not signed in. */

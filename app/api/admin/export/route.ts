@@ -24,7 +24,7 @@ export async function GET(request: Request) {
 
   switch (type) {
     case 'orders': {
-      const { items } = listOrders({ limit: 500 });
+      const { items } = await listOrders({ limit: 500 });
       rows = [
         ['Order', 'Date', 'Email', 'Name', 'Phone', 'Country', 'City', 'Payment', 'Fulfillment', 'Subtotal', 'Delivery', 'Total', 'Currency', 'Tracking'],
         ...items.map((o) => [
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
       break;
     }
     case 'transactions': {
-      const { items } = listTransactions({ limit: 500 });
+      const { items } = await listTransactions({ limit: 500 });
       rows = [
         ['Date', 'Order', 'Type', 'Status', 'Amount', 'Currency', 'Card', 'Provider', 'Reference', 'Email', 'Message'],
         ...items.map((t) => [
@@ -67,7 +67,7 @@ export async function GET(request: Request) {
       break;
     }
     case 'customers': {
-      const { items } = listCustomers('', 5000, 0);
+      const { items } = await listCustomers('', 5000, 0);
       rows = [
         ['Name', 'Email', 'Phone', 'Paid orders', 'Total spent', 'Accepts marketing', 'Joined'],
         ...items.map((c) => [c.name, c.email, c.phone, c.orders, money(c.spentCents), c.acceptsMarketing ? 'yes' : 'no', c.createdAt]),
@@ -75,7 +75,7 @@ export async function GET(request: Request) {
       break;
     }
     case 'subscribers': {
-      rows = [['Email', 'Subscribed'], ...listSubscribers().map((s) => [s.email, s.createdAt])];
+      rows = [['Email', 'Subscribed'], ...(await listSubscribers()).map((s) => [s.email, s.createdAt])];
       break;
     }
     default:

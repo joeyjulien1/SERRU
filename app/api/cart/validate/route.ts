@@ -10,6 +10,6 @@ const body = z.object({
 export async function POST(request: Request) {
   const parsed = body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: 'Invalid cart' }, { status: 400 });
-  const cart = priceCart(parsed.data.lines);
+  const cart = await priceCart(parsed.data.lines);
   return Response.json(cart, { headers: { 'Cache-Control': 'no-store' } });
 }

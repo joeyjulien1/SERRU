@@ -14,7 +14,7 @@ export function parseSort(value: string | undefined): ProductSort {
   return PRODUCT_SORTS.some((s) => s.value === value) ? (value as ProductSort) : 'featured';
 }
 
-export function Listing({
+export async function Listing({
   title,
   eyebrow,
   description,
@@ -29,11 +29,11 @@ export function Listing({
   params: ListingParams;
   basePath: string;
 }) {
-  const settings = getSettings();
+  const settings = await getSettings();
   const sort = parseSort(params.sort);
   const page = Math.max(1, Math.floor(Number(params.page) || 1));
   const filter = params.filter === 'hot' || params.filter === 'one-of-one' ? params.filter : undefined;
-  const { items, total } = listProducts({
+  const { items, total } = await listProducts({
     category,
     sort,
     hot: filter === 'hot',
@@ -43,7 +43,7 @@ export function Listing({
     offset: (page - 1) * PAGE_SIZE,
   });
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const categories = listCategories();
+  const categories = await listCategories();
   const keep: Record<string, string> = {};
   if (params.sort) keep.sort = sort;
   if (filter) keep.filter = filter;

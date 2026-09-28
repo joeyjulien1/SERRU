@@ -103,21 +103,23 @@ function mapVariant(r: VariantRow): Variant {
   };
 }
 
-function hydrate(rows: ProductRow[]): ProductDetail[] {
+async function hydrate(rows: ProductRow[]): Promise<ProductDetail[]> {
   if (!rows.length) return [];
   const ids = rows.map((r) => r.id);
   const ph = ids.map(() => '?').join(',');
-  const variantRows = all<VariantRow>(
-    `SELECT id, product_id, label, sku, price_cents, compare_at_cents, stock, position
-     FROM variants WHERE product_id IN (${ph}) ORDER BY position, id`,
-    ...ids,
-  );
-  const imageRows = all<MediaRow & { product_id: number }>(
-    `SELECT pi.product_id, m.id, m.file, m.thumb, m.width, m.height, m.alt
-     FROM product_images pi JOIN media m ON m.id = pi.media_id
-     WHERE pi.product_id IN (${ph}) ORDER BY pi.position, m.id`,
-    ...ids,
-  );
+  const [variantRows, imageRows] = await Promise.all([
+    all<VariantRow>(
+      `SELECT id, product_id, label, sku, price_cents, compare_at_cents, stock, position
+       FROM variants WHERE product_id IN (${ph}) ORDER BY position, id`,
+      ...ids,
+    ),
+    all<MediaRow & { product_id: number }>(
+      `SELECT pi.product_id, m.id, m.file, m.thumb, m.width, m.height, m.alt
+       FROM product_images pi JOIN media m ON m.id = pi.media_id
+       WHERE pi.product_id IN (${ph}) ORDER BY pi.position, m.id`,
+      ...ids,
+    ),
+  ]);
 
   const variantsBy = new Map<number, Variant[]>();
   for (const v of variantRows) {
@@ -199,7 +201,7 @@ export type ProductQuery = {
   status?: ProductStatus | 'any';
 };
 
-export function listProducts(query: ProductQuery = {}): { items: ProductDetail[]; total: number } {
+export async function listProducts(query: ProductQuery = {}): Promise<{ items: ProductDetail[]; total: number }> {
   const where: string[] = [];
   const params: (string | number)[] = [];
   const status = query.status ?? 'active';
@@ -223,39 +225,37 @@ export function listProducts(query: ProductQuery = {}): { items: ProductDetail[]
     params.push(like, like, like);
   }
   const whereSql = where.length ? ' WHERE ' + where.join(' AND ') : '';
-  const total =
-    get<{ n: number }>(
-      `SELECT COUNT(*) AS n FROM products p LEFT JOIN categories c ON c.id = p.category_id${whereSql}`,
-      ...params,
-    )?.n ?? 0;
   const limit = Math.min(Math.max(query.limit ?? 24, 1), 200);
   const offset = Math.max(query.offset ?? 0, 0);
-  const rows = all<ProductRow>(
-    `${PRODUCT_SELECT}${whereSql} ORDER BY ${ORDER_BY[query.sort ?? 'featured']} LIMIT ? OFFSET ?`,
-    ...params,
-    limit,
-    offset,
-  );
-  return { items: hydrate(rows), total };
+  const [count, rows] = await Promise.all([
+    get<{ n: number }>(`SELECT COUNT(*) AS n FROM products p LEFT JOIN categories c ON c.id = p.category_id${whereSql}`, ...params),
+    all<ProductRow>(
+      `${PRODUCT_SELECT}${whereSql} ORDER BY ${ORDER_BY[query.sort ?? 'featured']} LIMIT ? OFFSET ?`,
+      ...params,
+      limit,
+      offset,
+    ),
+  ]);
+  return { items: await hydrate(rows), total: count?.n ?? 0 };
 }
 
-export function getProductBySlug(slug: string): ProductDetail | null {
-  const row = get<ProductRow>(`${PRODUCT_SELECT} WHERE p.slug = ? AND p.status = 'active'`, slug);
-  return row ? hydrate([row])[0] : null;
+export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
+  const row = await get<ProductRow>(`${PRODUCT_SELECT} WHERE p.slug = ? AND p.status = 'active'`, slug);
+  return row ? (await hydrate([row]))[0] : null;
 }
 
-export function getProductById(id: number): ProductDetail | null {
-  const row = get<ProductRow>(`${PRODUCT_SELECT} WHERE p.id = ?`, id);
-  return row ? hydrate([row])[0] : null;
+export async function getProductById(id: number): Promise<ProductDetail | null> {
+  const row = await get<ProductRow>(`${PRODUCT_SELECT} WHERE p.id = ?`, id);
+  return row ? (await hydrate([row]))[0] : null;
 }
 
-export function relatedProducts(product: ProductDetail, limit = 4): ProductDetail[] {
+export async function relatedProducts(product: ProductDetail, limit = 4): Promise<ProductDetail[]> {
   const sameCategory = product.category
-    ? listProducts({ category: product.category.slug, excludeId: product.id, limit }).items
+    ? (await listProducts({ category: product.category.slug, excludeId: product.id, limit })).items
     : [];
   if (sameCategory.length >= limit) return sameCategory;
   const seen = new Set([product.id, ...sameCategory.map((p) => p.id)]);
-  const fill = listProducts({ sort: 'featured', limit: limit + seen.size }).items.filter((p) => !seen.has(p.id));
+  const fill = (await listProducts({ sort: 'featured', limit: limit + seen.size })).items.filter((p) => !seen.has(p.id));
   return [...sameCategory, ...fill].slice(0, limit);
 }
 
@@ -269,8 +269,8 @@ type CategoryRow = {
 } & Partial<Record<'m_id' | 'm_width' | 'm_height', number>> &
   Partial<Record<'m_file' | 'm_thumb' | 'm_alt', string>>;
 
-export function listCategories(): Category[] {
-  const rows = all<CategoryRow>(`
+export async function listCategories(): Promise<Category[]> {
+  const rows = await all<CategoryRow>(`
     SELECT c.id, c.slug, c.name, c.description, c.position,
       (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id AND p.status = 'active') AS product_count,
       m.id AS m_id, m.file AS m_file, m.thumb AS m_thumb, m.width AS m_width, m.height AS m_height, m.alt AS m_alt
@@ -301,16 +301,17 @@ export function listCategories(): Category[] {
   }));
 }
 
-export function getCategory(slug: string): Category | null {
-  return listCategories().find((c) => c.slug === slug) ?? null;
+export async function getCategory(slug: string): Promise<Category | null> {
+  return (await listCategories()).find((c) => c.slug === slug) ?? null;
 }
 
-export function catalogStats(): { available: number; categories: number } {
-  const available =
+export async function catalogStats(): Promise<{ available: number; categories: number }> {
+  const [available, categories] = await Promise.all([
     get<{ n: number }>(`
       SELECT COUNT(*) AS n FROM products p
       WHERE p.status = 'active' AND EXISTS (
-        SELECT 1 FROM variants v WHERE v.product_id = p.id AND (v.stock IS NULL OR v.stock > 0))`)?.n ?? 0;
-  const categories = get<{ n: number }>('SELECT COUNT(*) AS n FROM categories')?.n ?? 0;
-  return { available, categories };
+        SELECT 1 FROM variants v WHERE v.product_id = p.id AND (v.stock IS NULL OR v.stock > 0))`),
+    get<{ n: number }>('SELECT COUNT(*) AS n FROM categories'),
+  ]);
+  return { available: available?.n ?? 0, categories: categories?.n ?? 0 };
 }

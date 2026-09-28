@@ -25,9 +25,9 @@ export default async function ProductsPage(props: PageProps<'/admin/products'>) 
   const page = Math.max(1, Number(sp.page) || 1);
   const q = sp.q?.trim() ?? '';
   const category = sp.category ?? '';
-  const { items, total } = listProducts({ status, q, category: category || undefined, sort: 'newest', limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });
-  const categories = listCategories();
-  const currency = getSettings().currency;
+  const { items, total } = await listProducts({ status, q, category: category || undefined, sort: 'newest', limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });
+  const categories = await listCategories();
+  const currency = (await getSettings()).currency;
 
   return (
     <>

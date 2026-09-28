@@ -19,7 +19,7 @@ export default async function EditPagePage(props: PageProps<'/admin/pages/[slug]
   const admin = await requireAdminPage();
   const { slug } = await props.params;
   const { created } = (await props.searchParams) as { created?: string };
-  const page = getPage(slug);
+  const page = await getPage(slug);
   if (!page) notFound();
   return (
     <>

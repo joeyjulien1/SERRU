@@ -12,17 +12,18 @@ export const metadata: Metadata = { title: 'Orders' };
 const PAGE_SIZE = 25;
 
 export default async function OrdersPage(props: PageProps<'/admin/orders'>) {
-  const sp = (await props.searchParams) as { q?: string; payment?: string; fulfillment?: string; page?: string };
+  const sp = (await props.searchParams) as { q?: string; payment?: string; fulfillment?: string; view?: string; page?: string };
+  const view = sp.view === 'to-fulfil' || sp.view === 'cod-due' ? sp.view : undefined;
   const payment = (PAYMENT_STATUSES as string[]).includes(sp.payment ?? '') ? (sp.payment as PaymentStatus) : 'all';
   const fulfillment = (FULFILLMENT_STATUSES as string[]).includes(sp.fulfillment ?? '') ? (sp.fulfillment as FulfillmentStatus) : 'all';
   const q = sp.q?.trim() ?? '';
   const page = Math.max(1, Number(sp.page) || 1);
-  const { items, total } = listOrders({ q, payment, fulfillment, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });
+  const { items, total } = await listOrders({ q, payment, fulfillment, view, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });
 
-  const tabs = [
+  const tabs: { label: string; payment: string; fulfillment: string; view?: 'to-fulfil' | 'cod-due' }[] = [
     { label: 'All', payment: 'all', fulfillment: 'all' },
-    { label: 'To fulfil', payment: 'paid', fulfillment: 'unfulfilled' },
-    { label: 'Processing', payment: 'paid', fulfillment: 'processing' },
+    { label: 'To fulfil', payment: 'all', fulfillment: 'all', view: 'to-fulfil' },
+    { label: 'Cash to collect', payment: 'all', fulfillment: 'all', view: 'cod-due' },
     { label: 'Shipped', payment: 'all', fulfillment: 'shipped' },
     { label: 'Unpaid / failed', payment: 'failed', fulfillment: 'all' },
     { label: 'Refunded', payment: 'refunded', fulfillment: 'all' },
@@ -44,8 +45,8 @@ export default async function OrdersPage(props: PageProps<'/admin/orders'>) {
           {tabs.map((t) => (
             <Link
               key={t.label}
-              href={qs('/orders', { payment: t.payment, fulfillment: t.fulfillment })}
-              aria-current={payment === t.payment && fulfillment === t.fulfillment && !q ? 'page' : undefined}
+              href={qs('/orders', { payment: t.payment, fulfillment: t.fulfillment, view: t.view })}
+              aria-current={payment === t.payment && fulfillment === t.fulfillment && view === t.view && !q ? 'page' : undefined}
             >
               {t.label}
             </Link>
@@ -110,7 +111,7 @@ export default async function OrdersPage(props: PageProps<'/admin/orders'>) {
                       {o.city}, {countryName(o.country)}
                     </td>
                     <td>
-                      <StatusPill value={o.paymentStatus} />
+                      <StatusPill value={o.paymentStatus} label={o.paymentProvider === 'cod' && o.paymentStatus === 'pending' ? 'cash due' : undefined} />
                     </td>
                     <td>
                       <StatusPill value={o.fulfillmentStatus} />
@@ -123,7 +124,7 @@ export default async function OrdersPage(props: PageProps<'/admin/orders'>) {
             </table>
           </div>
         )}
-        {total > 0 && <Pager page={page} pageSize={PAGE_SIZE} total={total} href={(p) => qs('/orders', { q, payment, fulfillment, page: p })} />}
+        {total > 0 && <Pager page={page} pageSize={PAGE_SIZE} total={total} href={(p) => qs('/orders', { q, payment, fulfillment, view, page: p })} />}
       </div>
     </>
   );

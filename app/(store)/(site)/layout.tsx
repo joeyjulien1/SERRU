@@ -6,8 +6,8 @@ import { getCurrentCustomer } from '@/lib/customers';
 import { getSettings } from '@/lib/settings';
 
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
-  const settings = getSettings();
-  const categories = listCategories();
+  const settings = await getSettings();
+  const categories = await listCategories();
   const customer = await getCurrentCustomer();
   return (
     <>

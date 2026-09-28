@@ -15,7 +15,7 @@ export default async function TransactionsPage(props: PageProps<'/admin/transact
   const kind = sp.kind === 'charge' || sp.kind === 'refund' ? sp.kind : 'all';
   const status = sp.status === 'succeeded' || sp.status === 'failed' ? sp.status : 'all';
   const page = Math.max(1, Number(sp.page) || 1);
-  const { items, total } = listTransactions({ kind, status, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });
+  const { items, total } = await listTransactions({ kind, status, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });
 
   const tabs = [
     { label: 'All', kind: 'all', status: 'all' },

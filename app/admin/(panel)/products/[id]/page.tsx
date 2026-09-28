@@ -11,9 +11,9 @@ export const metadata: Metadata = { title: 'Edit product' };
 export default async function EditProductPage(props: PageProps<'/admin/products/[id]'>) {
   const { id } = await props.params;
   const { created } = (await props.searchParams) as { created?: string };
-  const product = getProductById(Number(id));
+  const product = await getProductById(Number(id));
   if (!product) notFound();
-  const categories = listCategories().map((c) => ({ id: c.id, name: c.name }));
+  const categories = (await listCategories()).map((c) => ({ id: c.id, name: c.name }));
   return (
     <>
       <PageHead

@@ -8,6 +8,7 @@ export const SETTING_DEFAULTS = {
   tagline: 'Luxury Perfected',
   currency: 'USD',
   default_country: 'LB',
+  cod_enabled: '1',
   shipping_flat_cents: '2500',
   free_shipping_threshold_cents: '50000',
   announcement: 'Complimentary delivery on orders over $500',
@@ -29,8 +30,8 @@ export const SETTING_DEFAULTS = {
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
 export type Settings = Record<SettingKey, string>;
 
-export const getSettings = cache((): Settings => {
-  const rows = all<{ key: string; value: string }>('SELECT key, value FROM settings');
+export const getSettings = cache(async (): Promise<Settings> => {
+  const rows = await all<{ key: string; value: string }>('SELECT key, value FROM settings');
   const out: Settings = { ...SETTING_DEFAULTS };
   for (const r of rows) {
     if (r.key in SETTING_DEFAULTS) out[r.key as SettingKey] = r.value;
@@ -38,11 +39,11 @@ export const getSettings = cache((): Settings => {
   return out;
 });
 
-export function saveSettings(values: Partial<Settings>): void {
-  tx(() => {
+export async function saveSettings(values: Partial<Settings>): Promise<void> {
+  await tx(async () => {
     for (const [key, value] of Object.entries(values)) {
       if (!(key in SETTING_DEFAULTS) || value === undefined) continue;
-      run(
+      await run(
         'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
         key,
         value,
@@ -51,7 +52,7 @@ export function saveSettings(values: Partial<Settings>): void {
   });
 }
 
-export function shippingRules(s: Settings = getSettings()): ShippingRules {
+export function shippingRules(s: Settings): ShippingRules {
   return {
     flatCents: Math.max(0, Number(s.shipping_flat_cents) || 0),
     freeThresholdCents: Math.max(0, Number(s.free_shipping_threshold_cents) || 0),

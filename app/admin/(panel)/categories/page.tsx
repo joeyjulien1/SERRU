@@ -14,8 +14,8 @@ export const metadata: Metadata = { title: 'Categories' };
 
 export default async function CategoriesPage(props: PageProps<'/admin/categories'>) {
   const { edit, deleted } = (await props.searchParams) as { edit?: string; deleted?: string };
-  const categories = listCategories();
-  const own = new Set(all<{ id: number }>('SELECT id FROM categories WHERE media_id IS NOT NULL').map((r) => r.id));
+  const categories = await listCategories();
+  const own = new Set((await all<{ id: number }>('SELECT id FROM categories WHERE media_id IS NOT NULL')).map((r) => r.id));
   const editing = categories.find((c) => String(c.id) === edit) ?? null;
   const nextPosition = categories.reduce((m, c) => Math.max(m, c.position), -1) + 1;
 

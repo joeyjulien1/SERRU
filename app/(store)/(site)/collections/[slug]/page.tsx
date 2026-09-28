@@ -5,7 +5,7 @@ import { getCategory } from '@/lib/catalog';
 
 export async function generateMetadata(props: PageProps<'/collections/[slug]'>): Promise<Metadata> {
   const { slug } = await props.params;
-  const category = getCategory(slug);
+  const category = await getCategory(slug);
   if (!category) return { title: 'Not found' };
   return {
     title: category.name,
@@ -17,7 +17,7 @@ export async function generateMetadata(props: PageProps<'/collections/[slug]'>):
 export default async function CollectionPage(props: PageProps<'/collections/[slug]'>) {
   const { slug } = await props.params;
   const params = (await props.searchParams) as ListingParams;
-  const category = getCategory(slug);
+  const category = await getCategory(slug);
   if (!category) notFound();
   return (
     <Listing

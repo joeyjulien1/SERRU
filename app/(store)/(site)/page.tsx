@@ -8,16 +8,18 @@ import { catalogStats, listCategories, listProducts } from '@/lib/catalog';
 import { getMedia } from '@/lib/media';
 import { getSettings } from '@/lib/settings';
 
-export default function HomePage() {
-  const settings = getSettings();
+export default async function HomePage() {
+  const settings = await getSettings();
   const currency = settings.currency;
-  const hot = listProducts({ hot: true, sort: 'featured', limit: 8 }).items;
-  const featured = hot.length ? hot : listProducts({ sort: 'featured', limit: 8 }).items;
-  const oneOfOne = listProducts({ oneOfOne: true, sort: 'newest', limit: 6 }).items;
-  const newest = listProducts({ sort: 'newest', limit: 4 }).items;
-  const categories = listCategories();
-  const stats = catalogStats();
-  const heroMedia = settings.hero_media_id ? getMedia(Number(settings.hero_media_id)) : null;
+  const [hot, oneOfOne, newest, categories, stats, heroMedia] = await Promise.all([
+    listProducts({ hot: true, sort: 'featured', limit: 8 }).then((r) => r.items),
+    listProducts({ oneOfOne: true, sort: 'newest', limit: 6 }).then((r) => r.items),
+    listProducts({ sort: 'newest', limit: 4 }).then((r) => r.items),
+    listCategories(),
+    catalogStats(),
+    settings.hero_media_id ? getMedia(Number(settings.hero_media_id)) : null,
+  ]);
+  const featured = hot.length ? hot : (await listProducts({ sort: 'featured', limit: 8 })).items;
   const marquee = settings.marquee
     .split('\n')
     .map((s) => s.trim())

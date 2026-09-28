@@ -1,5 +1,5 @@
 import 'server-only';
-import type Stripe from 'stripe';
+import { countryName } from './countries';
 import { formatMoney, orderLabel } from './format';
 import { adminUrl, storeUrl } from './hosts';
 import { notifyAddress, sendMail } from './mailer';
@@ -12,65 +12,64 @@ import {
   staleOrders,
   type Order,
 } from './orders';
-import { stripe } from './payments';
+import { retrieveTapCharge, TAP_FAILED_STATUSES, tapAmountToCents, type TapCharge } from './payments';
 import { getSettings } from './settings';
 
-function cardFrom(pi: Stripe.PaymentIntent): { brand: string; last4: string } {
-  const charge = typeof pi.latest_charge === 'object' && pi.latest_charge ? pi.latest_charge : null;
-  const card = charge?.payment_method_details?.card;
-  return { brand: card?.brand ?? '', last4: card?.last4 ?? '' };
-}
-
 /**
- * Reconciles a Stripe order with its PaymentIntent. Safe to call repeatedly
- * (from the thank-you page, the webhook and the stale-order sweep).
+ * Reconciles a Tap order with its charge, always fetched from Tap's API (never trusted from
+ * the browser or a webhook body). Safe to call repeatedly: from the return page, the webhook
+ * and the stale-order sweep.
  */
-export async function syncStripeOrder(order: Order): Promise<Order> {
-  if (order.paymentProvider !== 'stripe' || !order.paymentRef || order.paymentStatus !== 'pending') return order;
-  const pi = await stripe().paymentIntents.retrieve(order.paymentRef, { expand: ['latest_charge'] });
-  if (pi.metadata?.order_id && pi.metadata.order_id !== String(order.id)) return order;
+export async function syncTapOrder(order: Order, fetched?: TapCharge): Promise<Order> {
+  if (order.paymentProvider !== 'tap' || !order.paymentRef) return order;
+  // Expired/failed orders are still checked: a payment completed late must not be lost (markOrderPaid re-takes the stock).
+  if (order.paymentStatus === 'paid' || order.paymentStatus === 'refunded') return order;
+  const charge = fetched ?? (await retrieveTapCharge(order.paymentRef));
+  if (charge.id !== order.paymentRef) return order;
+  if (charge.metadata?.order_id && charge.metadata.order_id !== String(order.id)) return order;
 
-  if (pi.status === 'succeeded') {
-    if (pi.amount_received !== order.totalCents || pi.currency.toUpperCase() !== order.currency.toUpperCase()) {
-      console.error(`[checkout] amount mismatch on order ${order.number}: ${pi.amount_received} ${pi.currency}`);
+  const card = {
+    brand: (charge.card?.brand ?? charge.card?.scheme ?? '').toLowerCase(),
+    last4: charge.card?.last_four ?? '',
+  };
+
+  if (charge.status === 'CAPTURED') {
+    const cents = tapAmountToCents(charge.amount);
+    if (cents !== order.totalCents || charge.currency.toUpperCase() !== order.currency.toUpperCase()) {
+      console.error(`[checkout] amount mismatch on order ${order.number}: ${charge.amount} ${charge.currency}`);
       return order;
     }
-    const { brand, last4 } = cardFrom(pi);
-    const firstTime = markOrderPaid(order.id, {
-      provider: 'stripe',
-      ref: pi.id,
-      amountCents: pi.amount_received,
+    const firstTime = await markOrderPaid(order.id, {
+      provider: 'tap',
+      ref: charge.id,
+      amountCents: cents,
       currency: order.currency,
-      brand,
-      last4,
+      ...card,
+      message: charge.response?.message || 'Captured',
     });
     if (firstTime) await sendOrderEmails(order.id);
-  } else if (pi.status === 'canceled') {
-    markOrderFailed(order.id, {
-      provider: 'stripe',
-      ref: pi.id,
+  } else if (TAP_FAILED_STATUSES.has(charge.status)) {
+    await markOrderFailed(order.id, {
+      provider: 'tap',
+      ref: charge.id,
       amountCents: order.totalCents,
       currency: order.currency,
-      message: pi.cancellation_reason ? `Canceled: ${pi.cancellation_reason}` : 'Payment canceled',
+      ...card,
+      message: charge.response?.message || `Payment ${charge.status.toLowerCase()}`,
     });
   }
-  return getOrder(order.id) ?? order;
+  return (await getOrder(order.id)) ?? order;
 }
 
-/** Releases stock held by abandoned checkouts. Called lazily from checkout and the admin dashboard. */
+/** Releases stock held by abandoned card checkouts. Called lazily from checkout and the admin dashboard. */
 export async function sweepStaleOrders(): Promise<void> {
-  for (const order of staleOrders()) {
+  for (const order of await staleOrders()) {
     try {
-      if (order.paymentProvider === 'stripe' && order.paymentRef) {
-        const synced = await syncStripeOrder(order);
+      if (order.paymentProvider === 'tap' && order.paymentRef) {
+        const synced = await syncTapOrder(order);
         if (synced.paymentStatus !== 'pending') continue;
-        const pi = await stripe().paymentIntents.retrieve(order.paymentRef);
-        if (pi.status === 'processing') continue; // bank still deciding; check again later
-        if (pi.status !== 'succeeded' && pi.status !== 'canceled') {
-          await stripe().paymentIntents.cancel(pi.id, { cancellation_reason: 'abandoned' });
-        }
       }
-      markOrderExpired(order.id);
+      await markOrderExpired(order.id);
     } catch (err) {
       console.error(`[checkout] could not expire order ${order.number}`, err);
     }
@@ -78,10 +77,10 @@ export async function sweepStaleOrders(): Promise<void> {
 }
 
 export async function sendOrderEmails(orderId: number): Promise<void> {
-  const order = getOrder(orderId);
+  const order = await getOrder(orderId);
   if (!order) return;
-  const items = getOrderItems(orderId);
-  const settings = getSettings();
+  const [items, settings] = await Promise.all([getOrderItems(orderId), getSettings()]);
+  const cod = order.paymentProvider === 'cod';
   const money = (c: number) => formatMoney(c, order.currency);
   const lines = items.map((i) => `  ${i.quantity} × ${i.title} — ${i.variantLabel}   ${money(i.unitPriceCents * i.quantity)}`);
   const summary = [
@@ -89,16 +88,27 @@ export async function sendOrderEmails(orderId: number): Promise<void> {
     '',
     `  Subtotal   ${money(order.subtotalCents)}`,
     `  Delivery   ${order.shippingCents ? money(order.shippingCents) : 'Complimentary'}`,
-    `  Total      ${money(order.totalCents)}`,
+    `  Total      ${money(order.totalCents)}${cod ? '  — to pay in cash on delivery' : ''}`,
   ].join('\n');
-  const address = [order.shipName, order.address1, order.address2, `${order.city} ${order.postal}`.trim(), order.region, order.country]
+  const address = [
+    order.shipName,
+    order.address1,
+    order.address2,
+    `${order.city} ${order.postal}`.trim(),
+    order.region,
+    countryName(order.country),
+  ]
     .filter(Boolean)
     .join('\n  ');
 
   await sendMail({
     to: order.email,
     subject: `${settings.store_name} — order ${orderLabel(order.number)} confirmed`,
-    text: `Thank you for your order.\n\nOrder ${orderLabel(order.number)}\n\n${summary}\n\nDelivering to:\n  ${address}\n\nView your order: ${storeUrl()}/checkout/success/${order.number}?token=${order.token}\n\nWe'll email you again when your piece ships.\n\n${settings.store_name} — ${settings.tagline}`,
+    text:
+      `Thank you for your order.\n\nOrder ${orderLabel(order.number)}\n\n${summary}\n\n` +
+      (cod ? `Please have ${money(order.totalCents)} ready in cash when your order is delivered.\n\n` : '') +
+      `Delivering to:\n  ${address}\n\nView your order: ${storeUrl()}/checkout/success/${order.number}?token=${order.token}\n\n` +
+      `We'll email you again when your piece ships.\n\n${settings.store_name} — ${settings.tagline}`,
   });
 
   const notify = notifyAddress();
@@ -106,8 +116,8 @@ export async function sendOrderEmails(orderId: number): Promise<void> {
     await sendMail({
       to: notify,
       replyTo: order.email,
-      subject: `New order ${orderLabel(order.number)} — ${money(order.totalCents)}`,
-      text: `New paid order from ${order.shipName} <${order.email}>.\n\n${summary}\n\nManage: ${adminUrl()}/orders/${order.id}`,
+      subject: `New ${cod ? 'cash-on-delivery' : 'paid'} order ${orderLabel(order.number)} — ${money(order.totalCents)}`,
+      text: `New ${cod ? 'cash-on-delivery' : 'paid'} order from ${order.shipName} <${order.email}>${order.phone ? ` · ${order.phone}` : ''}.\n\n${summary}\n\nManage: ${adminUrl()}/orders/${order.id}`,
     });
   }
 }
