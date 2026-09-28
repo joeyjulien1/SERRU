@@ -142,7 +142,7 @@ export default async function ProductPage(props: PageProps<'/products/[slug]'>) 
               )}
               <details>
                 <summary>
-                  Delivery &amp; returns <Icon name="plus" size={18} />
+                  Delivery <Icon name="plus" size={18} />
                 </summary>
                 <div className="accordion__body">
                   {shippingNote}
@@ -150,10 +150,6 @@ export default async function ProductPage(props: PageProps<'/products/[slug]'>) 
                   {'\n\n'}
                   <Link className="link" href="/pages/shipping">
                     Shipping policy
-                  </Link>
-                  {' · '}
-                  <Link className="link" href="/pages/returns">
-                    Refund policy
                   </Link>
                 </div>
               </details>

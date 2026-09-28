@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { Icon } from '@/components/Icon';
 import { formatDate } from '@/lib/format';
 import { getPage, parseBlocks } from '@/lib/pages';
+import { getSettings } from '@/lib/settings';
 
 export async function generateMetadata(props: PageProps<'/pages/[slug]'>): Promise<Metadata> {
   const { slug } = await props.params;
@@ -15,6 +17,8 @@ export default async function ContentPage(props: PageProps<'/pages/[slug]'>) {
   const page = await getPage(slug);
   if (!page) notFound();
   const blocks = parseBlocks(page.body);
+  // The About page always shows the company's phone and email (Admin → Settings → Contact details).
+  const settings = slug === 'about' ? await getSettings() : null;
   return (
     <div className="container container--narrow" style={{ paddingBottom: 96 }}>
       <header className="page-head">
@@ -43,6 +47,33 @@ export default async function ContentPage(props: PageProps<'/pages/[slug]'>) {
           ),
         )}
       </div>
+      {settings && (settings.contact_phone || settings.contact_email) && (
+        <section aria-labelledby="about-contact" style={{ marginTop: 40 }}>
+          <h2 id="about-contact" className="h3" style={{ marginBottom: 16 }}>
+            Get in touch
+          </h2>
+          <div className="contact-methods">
+            {settings.contact_phone && (
+              <a className="contact-method" href={`tel:${settings.contact_phone.replace(/\s/g, '')}`}>
+                <Icon name="phone" size={24} />
+                <span>
+                  <small>Phone</small>
+                  {settings.contact_phone}
+                </span>
+              </a>
+            )}
+            {settings.contact_email && (
+              <a className="contact-method" href={`mailto:${settings.contact_email}`}>
+                <Icon name="mail" size={24} />
+                <span>
+                  <small>Email</small>
+                  {settings.contact_email}
+                </span>
+              </a>
+            )}
+          </div>
+        </section>
+      )}
       {slug === 'about' && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 40 }}>
           <Link href="/shop" className="btn">

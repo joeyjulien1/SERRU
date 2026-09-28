@@ -13,7 +13,7 @@ import { getPage } from '@/lib/pages';
 export const metadata: Metadata = { title: 'Edit page' };
 
 // Pages linked from the footer and checkout; deleting them would break those links.
-const CORE = new Set(['about', 'shipping', 'returns', 'privacy', 'terms']);
+const CORE = new Set(['about', 'shipping', 'privacy', 'terms']);
 
 export default async function EditPagePage(props: PageProps<'/admin/pages/[slug]'>) {
   const admin = await requireAdminPage();

@@ -499,7 +499,6 @@ function CheckoutForm({
           </button>
 
           <nav className="checkout-footer-links" aria-label="Policies">
-            <Link href="/pages/returns">Refund policy</Link>
             <Link href="/pages/shipping">Shipping</Link>
             <Link href="/pages/privacy">Privacy policy</Link>
             <Link href="/pages/terms">Terms of service</Link>

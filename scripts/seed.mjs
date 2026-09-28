@@ -68,20 +68,6 @@ Every piece is wrapped, corner-protected and crated or boxed according to its si
 ## Tracking
 You will receive an email with tracking details as soon as your order ships. You can also see your order status in your account.`,
   ],
-  returns: [
-    'Refund Policy',
-    `## Ready-made pieces
-If a ready-made piece is not right for you, contact us within 14 days of delivery. Items must be returned unused and in their original packaging. Return shipping is the customer's responsibility unless the item arrived damaged.
-
-## Made-to-order and custom pieces
-Pieces made to order or produced to custom specifications cannot be returned unless they arrive damaged or defective.
-
-## Damaged items
-Inspect your delivery on arrival. If anything is damaged, email us photos within 48 hours and we will repair, replace or refund it.
-
-## Refunds
-Approved refunds are issued to the original payment card. Depending on your bank, it can take 5–10 business days to appear.`,
-  ],
   privacy: [
     'Privacy Policy',
     `## What we collect
@@ -121,6 +107,15 @@ await db.batch(
   })),
   'write',
 );
+// The store no longer publishes a refund policy: remove the starter page once
+// (the marker lets an admin create a "returns" page again later if wanted).
+if (!(await one("SELECT 1 AS done FROM settings WHERE key = 'removed_refund_policy'"))) {
+  await db.batch(
+    ["DELETE FROM pages WHERE slug = 'returns'", "INSERT INTO settings (key, value) VALUES ('removed_refund_policy', '1')"],
+    'write',
+  );
+  log('refund policy page removed');
+}
 log('pages ready');
 
 // ───────────── Owner admin (ADMIN_EMAIL / ADMIN_PASSWORD) ─────────────

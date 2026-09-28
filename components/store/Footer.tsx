@@ -79,9 +79,6 @@ export function Footer({
                 <Link href="/pages/shipping">Shipping policy</Link>
               </li>
               <li>
-                <Link href="/pages/returns">Refund policy</Link>
-              </li>
-              <li>
                 <Link href="/pages/privacy">Privacy policy</Link>
               </li>
               <li>
