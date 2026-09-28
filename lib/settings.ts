@@ -11,7 +11,7 @@ export const SETTING_DEFAULTS = {
   cod_enabled: '1',
   shipping_flat_cents: '2500',
   free_shipping_threshold_cents: '50000',
-  announcement: 'New — see any piece on your own wall before you order',
+  announcement: 'See any piece on your own wall before you order',
   hero_eyebrow: 'Plexi · Metal · Wood · Parametric · Mirrors · 3D · Sculpture',
   hero_title: 'Art that shapes the room.',
   hero_subtitle:

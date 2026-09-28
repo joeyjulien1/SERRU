@@ -121,8 +121,8 @@ log('pages ready');
 // The announcement bar now promotes "See it on your wall". Only the untouched old default is replaced;
 // a message written in Admin → Settings is kept.
 await db.execute({
-  sql: "UPDATE settings SET value = ? WHERE key = 'announcement' AND value = 'Complimentary delivery on orders over $500'",
-  args: ['New — see any piece on your own wall before you order'],
+  sql: "UPDATE settings SET value = ? WHERE key = 'announcement' AND value IN ('Complimentary delivery on orders over $500', 'New — see any piece on your own wall before you order')",
+  args: ['See any piece on your own wall before you order'],
 });
 
 // ───────────── Owner admin (ADMIN_EMAIL / ADMIN_PASSWORD) ─────────────
