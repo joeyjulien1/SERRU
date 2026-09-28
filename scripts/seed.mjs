@@ -118,6 +118,13 @@ if (!(await one("SELECT 1 AS done FROM settings WHERE key = 'removed_refund_poli
 }
 log('pages ready');
 
+// The announcement bar now promotes "See it on your wall". Only the untouched old default is replaced;
+// a message written in Admin → Settings is kept.
+await db.execute({
+  sql: "UPDATE settings SET value = ? WHERE key = 'announcement' AND value = 'Complimentary delivery on orders over $500'",
+  args: ['New — see any piece on your own wall before you order'],
+});
+
 // ───────────── Owner admin (ADMIN_EMAIL / ADMIN_PASSWORD) ─────────────
 // Creates the owner, and whenever ADMIN_PASSWORD changes, sets that admin's password to it — so changing
 // it (in .env.local or Vercel) and re-running the seed / redeploying is also how to regain access.

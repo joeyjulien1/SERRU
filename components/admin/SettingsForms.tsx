@@ -138,10 +138,6 @@ export function StoreSettingsForm({
               {e.hero_media_id && <span className="field-error">{e.hero_media_id}</span>}
             </div>
             {render({ name: 'marquee', label: 'Scrolling banner lines', type: 'textarea', rows: 4, hint: 'One phrase per line.' })}
-            <div className="form-row form-row--2" style={{ marginTop: 14 }}>
-              {render({ name: 'stat_crafted', label: 'Stat: pieces crafted', placeholder: 'e.g. 350', hint: 'Leave empty to hide.' })}
-              {render({ name: 'stat_collectors', label: 'Stat: happy collectors', placeholder: 'e.g. 200', hint: 'Leave empty to hide.' })}
-            </div>
           </div>
         </section>
 

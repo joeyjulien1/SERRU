@@ -3,20 +3,24 @@ import { CategoryArt } from '@/components/CategoryArt';
 import { Icon } from '@/components/Icon';
 import { Newsletter } from '@/components/store/Newsletter';
 import { ProductCard } from '@/components/store/ProductCard';
-import { StatRoller } from '@/components/store/StatRoller';
-import { catalogStats, listCategories, listProducts } from '@/lib/catalog';
+import { listCategories, listProducts } from '@/lib/catalog';
 import { getMedia } from '@/lib/media';
 import { getSettings } from '@/lib/settings';
+
+const PROMISES = [
+  { title: 'Made to measure', text: 'Every piece can be sized and finished to suit your wall.' },
+  { title: 'Crafted in our lab', text: 'Designed, cut and finished by hand, in-house.' },
+  { title: 'Delivered with care', text: 'Crated, insured and ready to hang when it arrives.' },
+];
 
 export default async function HomePage() {
   const settings = await getSettings();
   const currency = settings.currency;
-  const [hot, oneOfOne, newest, categories, stats, heroMedia] = await Promise.all([
+  const [hot, oneOfOne, newest, categories, heroMedia] = await Promise.all([
     listProducts({ hot: true, sort: 'featured', limit: 8 }).then((r) => r.items),
     listProducts({ oneOfOne: true, sort: 'newest', limit: 6 }).then((r) => r.items),
     listProducts({ sort: 'newest', limit: 4 }).then((r) => r.items),
     listCategories(),
-    catalogStats(),
     settings.hero_media_id ? getMedia(Number(settings.hero_media_id)) : null,
   ]);
   const featured = hot.length ? hot : (await listProducts({ sort: 'featured', limit: 8 })).items;
@@ -24,13 +28,6 @@ export default async function HomePage() {
     .split('\n')
     .map((s) => s.trim())
     .filter(Boolean);
-
-  const statItems = [
-    settings.stat_crafted && { value: Number(settings.stat_crafted.replace(/\D/g, '')), suffix: '+', label: 'Pieces crafted' },
-    settings.stat_collectors && { value: Number(settings.stat_collectors.replace(/\D/g, '')), suffix: '+', label: 'Happy collectors' },
-    { value: stats.available, suffix: '', label: 'Pieces available now' },
-    { value: stats.categories, suffix: '', label: 'Art disciplines' },
-  ].filter((s): s is { value: number; suffix: string; label: string } => !!s && Number.isFinite(s.value));
 
   return (
     <>
@@ -214,24 +211,24 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* ───────── Stats ───────── */}
+      {/* ───────── Promises ───────── */}
       <section className="section section--dark" aria-labelledby="stats-title">
         <div className="container">
           <div className="section-head">
             <div className="section-head__text">
               <span className="eyebrow" style={{ color: 'var(--teal-300)' }}>
-                The lab so far
+                The SERRU LAB promise
               </span>
               <h2 id="stats-title" className="h1">
                 Crafted with obsession.
               </h2>
             </div>
           </div>
-          <div className="stats" style={{ '--stat-cols': statItems.length } as React.CSSProperties}>
-            {statItems.map((s) => (
-              <div className="stat" key={s.label}>
-                <StatRoller value={s.value} suffix={s.suffix} />
-                <span className="stat__label">{s.label}</span>
+          <div className="stats" style={{ '--stat-cols': PROMISES.length } as React.CSSProperties}>
+            {PROMISES.map((p) => (
+              <div className="stat" key={p.title}>
+                <h3 className="stat__title">{p.title}</h3>
+                <p className="stat__text">{p.text}</p>
               </div>
             ))}
           </div>

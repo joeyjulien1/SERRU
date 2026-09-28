@@ -304,14 +304,3 @@ export async function listCategories(): Promise<Category[]> {
 export async function getCategory(slug: string): Promise<Category | null> {
   return (await listCategories()).find((c) => c.slug === slug) ?? null;
 }
-
-export async function catalogStats(): Promise<{ available: number; categories: number }> {
-  const [available, categories] = await Promise.all([
-    get<{ n: number }>(`
-      SELECT COUNT(*) AS n FROM products p
-      WHERE p.status = 'active' AND EXISTS (
-        SELECT 1 FROM variants v WHERE v.product_id = p.id AND (v.stock IS NULL OR v.stock > 0))`),
-    get<{ n: number }>('SELECT COUNT(*) AS n FROM categories'),
-  ]);
-  return { available: available?.n ?? 0, categories: categories?.n ?? 0 };
-}

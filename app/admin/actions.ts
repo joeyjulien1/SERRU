@@ -499,16 +499,11 @@ export async function saveSettingsAction(_: FormState, data: FormData): Promise<
   text('whatsapp', 40);
   text('instagram', 120);
   text('address', 300);
-  text('stat_crafted', 9);
-  text('stat_collectors', 9);
 
   // Checkbox: absent from the form data when unticked, so a hidden marker tells us it was on the page.
   if (data.has('cod_enabled_present')) next.cod_enabled = bool(data.get('cod_enabled')) ? '1' : '0';
 
   if (next.contact_email && !EMAIL_PATTERN.test(next.contact_email)) errors.contact_email = 'Enter a valid email address';
-  for (const k of ['stat_crafted', 'stat_collectors'] as const) {
-    if (next[k] && !/^\d+$/.test(next[k]!)) errors[k] = 'Numbers only (leave empty to hide)';
-  }
 
   if (data.has('currency')) {
     const c = str(data.get('currency'));
