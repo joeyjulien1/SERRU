@@ -130,6 +130,9 @@ if (adminCount === 0) {
   const password = process.env.ADMIN_PASSWORD || '';
   if (!email || password.length < 8) {
     console.warn('! No admin created: set ADMIN_EMAIL and ADMIN_PASSWORD (8+ characters) in .env.local (or in Vercel), then run the seed again.');
+  } else if (password === 'change-me-to-a-long-random-password' && process.env.VERCEL) {
+    // The placeholder from .env.example is public: never use it on a live site.
+    console.warn('! No admin created: ADMIN_PASSWORD is still the example value. Set your own password in Vercel, then redeploy.');
   } else {
     const salt = crypto.randomBytes(16);
     const hash = crypto.scryptSync(password, salt, 64, { N: 16384, r: 8, p: 1 });
