@@ -123,25 +123,61 @@ await db.batch(
 );
 log('pages ready');
 
-// ───────────── First admin ─────────────
-const adminCount = (await one('SELECT COUNT(*) AS n FROM admins')).n;
-if (adminCount === 0) {
-  const email = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
-  const password = process.env.ADMIN_PASSWORD || '';
-  if (!email || password.length < 8) {
-    console.warn('! No admin created: set ADMIN_EMAIL and ADMIN_PASSWORD (8+ characters) in .env.local (or in Vercel), then run the seed again.');
-  } else if (password === 'change-me-to-a-long-random-password' && process.env.VERCEL) {
-    // The placeholder from .env.example is public: never use it on a live site.
-    console.warn('! No admin created: ADMIN_PASSWORD is still the example value. Set your own password in Vercel, then redeploy.');
-  } else {
-    const salt = crypto.randomBytes(16);
-    const hash = crypto.scryptSync(password, salt, 64, { N: 16384, r: 8, p: 1 });
-    const stored = ['scrypt', 16384, 8, 1, salt.toString('base64'), hash.toString('base64')].join('$');
-    await db.execute({ sql: "INSERT INTO admins (email, name, password_hash, role) VALUES (?, 'Store Owner', ?, 'owner')", args: [email, stored] });
-    log(`owner admin created for ${email} (password from ADMIN_PASSWORD)`);
+// ───────────── Owner admin (ADMIN_EMAIL / ADMIN_PASSWORD) ─────────────
+// Creates the owner, and whenever ADMIN_PASSWORD changes, sets that admin's password to it — so changing
+// it (in .env.local or Vercel) and re-running the seed / redeploying is also how to regain access.
+// A password changed later in Admin → Settings is kept until ADMIN_PASSWORD itself changes.
+// Same format as lib/password.ts: scrypt$N$r$p$saltBase64$hashBase64
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16);
+  const hash = crypto.scryptSync(password, salt, 64, { N: 16384, r: 8, p: 1 });
+  return ['scrypt', 16384, 8, 1, salt.toString('base64'), hash.toString('base64')].join('$');
+}
+function passwordMatches(password, stored) {
+  const [kind, n, r, p, salt, hash] = String(stored ?? '').split('$');
+  if (kind !== 'scrypt' || !hash) return false;
+  const expected = Buffer.from(hash, 'base64');
+  const actual = crypto.scryptSync(password, Buffer.from(salt, 'base64'), expected.length, { N: Number(n), r: Number(r), p: Number(p) });
+  return crypto.timingSafeEqual(actual, expected);
+}
+
+const adminEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+// Trimmed: a pasted value easily carries a trailing space or line break that nobody types at sign-in.
+const adminPassword = (process.env.ADMIN_PASSWORD || '').trim();
+const adminProblem = !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)
+  ? 'ADMIN_EMAIL is missing or not an email address'
+  : adminPassword.length < 8
+    ? 'ADMIN_PASSWORD is missing or shorter than 8 characters'
+    : process.env.VERCEL && adminPassword === 'change-me-to-a-long-random-password'
+      ? 'ADMIN_PASSWORD is still the public example value from .env.example'
+      : null;
+
+if (adminProblem) {
+  const adminCount = (await one('SELECT COUNT(*) AS n FROM admins')).n;
+  if (process.env.VERCEL && adminCount === 0) {
+    console.error(`✗ Build stopped: no admin account can be created — ${adminProblem}. Fix it in Vercel → Settings → Environment Variables, then redeploy.`);
+    process.exit(1);
   }
+  console.warn(`! Admin not created or updated: ${adminProblem}.`);
 } else {
-  log('admin already exists — skipped');
+  const marker = (await one("SELECT value FROM settings WHERE key = 'seed_admin_password'"))?.value;
+  const existing = await one('SELECT id FROM admins WHERE email = ?', adminEmail);
+  if (existing && passwordMatches(adminPassword, marker)) {
+    log(`admin ${adminEmail} ready`);
+  } else {
+    const writes = existing
+      ? [
+          { sql: 'UPDATE admins SET password_hash = ? WHERE id = ?', args: [hashPassword(adminPassword), existing.id] },
+          { sql: "DELETE FROM sessions WHERE kind = 'admin' AND user_id = ?", args: [existing.id] },
+        ]
+      : [{ sql: "INSERT INTO admins (email, name, password_hash, role) VALUES (?, 'Store Owner', ?, 'owner')", args: [adminEmail, hashPassword(adminPassword)] }];
+    writes.push({
+      sql: "INSERT INTO settings (key, value) VALUES ('seed_admin_password', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      args: [hashPassword(adminPassword)],
+    });
+    await db.batch(writes, 'write');
+    log(existing ? `password of ${adminEmail} set from ADMIN_PASSWORD` : `owner admin created for ${adminEmail}`);
+  }
 }
 
 // ───────────── Starter products (from _source photos) ─────────────

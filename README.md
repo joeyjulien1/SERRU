@@ -113,7 +113,8 @@ and uploaded photos in **Vercel Blob**. On your computer nothing changes: withou
 3. **Domains** (project → Settings → Domains): the store domain (e.g. `serrulab.com`) and the admin domain
    (e.g. `admin.serrulab.com`), both on the same project.
 4. **Environment variables**: `STORE_URL` and `ADMIN_URL` (full `https://` addresses of those two domains),
-   `ADMIN_EMAIL` + `ADMIN_PASSWORD` (the first admin, created by the seed), `TAP_SECRET_KEY`, and the SMTP settings.
+   `ADMIN_EMAIL` + `ADMIN_PASSWORD` (the owner admin, created by the seed), `TAP_SECRET_KEY`, and the SMTP settings.
+   Locked out? Change `ADMIN_PASSWORD` and redeploy: the seed sets that admin's password whenever the value changes.
 5. **Redeploy.** Every push to `main` deploys again; data in Turso and Blob is kept.
 
 Put the Vercel functions in the same region as the Turso database (Settings → Functions → Region) — every page reads the database.
