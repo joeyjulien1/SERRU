@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { Settings } from '@/lib/settings';
-import { Icon, PaymentMarks } from '../Icon';
+import { Icon } from '../Icon';
+import { PaymentMethods } from './PaymentMethods';
 
 export function whatsappLink(number: string): string {
   return `https://wa.me/${number.replace(/[^\d]/g, '')}`;
@@ -12,15 +13,7 @@ export function instagramLink(handle: string): string {
   return `https://instagram.com/${h.replace(/^@/, '')}`;
 }
 
-export function Footer({
-  settings,
-  categories,
-  signedIn,
-}: {
-  settings: Settings;
-  categories: { slug: string; name: string }[];
-  signedIn: boolean;
-}) {
+export function Footer({ settings, categories }: { settings: Settings; categories: { slug: string; name: string }[] }) {
   const year = new Date().getFullYear();
   return (
     <footer className="site-footer">
@@ -88,19 +81,18 @@ export function Footer({
           </div>
 
           <div>
-            <h3>Account</h3>
+            <h3>Customer care</h3>
             <ul>
-              <li>
-                <Link href={signedIn ? '/account' : '/account/login'}>{signedIn ? 'My account' : 'Sign in'}</Link>
-              </li>
-              {!signedIn && (
-                <li>
-                  <Link href="/account/register">Create account</Link>
-                </li>
-              )}
               <li>
                 <Link href="/cart">Cart</Link>
               </li>
+              {settings.whatsapp && (
+                <li>
+                  <a href={whatsappLink(settings.whatsapp)} target="_blank" rel="noopener noreferrer">
+                    WhatsApp {settings.whatsapp}
+                  </a>
+                </li>
+              )}
               {settings.contact_phone && (
                 <li>
                   <a href={`tel:${settings.contact_phone.replace(/\s/g, '')}`}>{settings.contact_phone}</a>
@@ -115,11 +107,15 @@ export function Footer({
           </div>
         </div>
 
+        <div className="site-footer__payments">
+          <h3>Payment</h3>
+          <PaymentMethods />
+        </div>
+
         <div className="site-footer__bottom">
           <span>
             © {year} {settings.store_name}. {settings.tagline}.
           </span>
-          <PaymentMarks />
         </div>
       </div>
     </footer>

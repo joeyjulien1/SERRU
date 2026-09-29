@@ -37,7 +37,7 @@ export default async function ProductPage(props: PageProps<'/products/[slug]'>) 
   const shippingNote =
     Number(settings.free_shipping_threshold_cents) > 0
       ? `Complimentary delivery on orders over ${formatMoney(Number(settings.free_shipping_threshold_cents), settings.currency)}.`
-      : 'Delivery fees are calculated at checkout.';
+      : 'Delivery fees are shown in your cart.';
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -107,7 +107,7 @@ export default async function ProductPage(props: PageProps<'/products/[slug]'>) 
 
             <ul className="trust">
               <li>
-                <Icon name="lock" size={22} /> Secure card checkout
+                <Icon name="cash" size={22} /> Whish or cash on delivery
               </li>
               <li>
                 <Icon name="box" size={22} /> Crated &amp; insured

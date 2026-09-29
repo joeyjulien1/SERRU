@@ -9,6 +9,7 @@ import { Icon } from '../Icon';
 import { Alert } from '../ui';
 import { useCart } from './CartProvider';
 import { QuantityStepper } from './QuantityStepper';
+import { WhatsAppOrderButton } from './WhatsAppOrderButton';
 
 export function FreeShippingProgress({ subtotalCents }: { subtotalCents: number }) {
   const { shipping, currency } = useCart();
@@ -131,9 +132,10 @@ export function CartDrawer() {
                 <span>{shippingCents === 0 ? 'Complimentary' : formatMoney(shippingCents, currency)}</span>
               </div>
             </div>
-            <Link href="/checkout" className="btn btn--block btn--lg" onClick={close}>
-              <Icon name="lock" size={16} /> Checkout · {formatMoney(subtotalCents + shippingCents, currency)}
-            </Link>
+            <WhatsAppOrderButton showTotal onNavigate={close} />
+            <p className="tiny muted" style={{ marginTop: 10, textAlign: 'center' }}>
+              Pay with Whish Money or cash on delivery.
+            </p>
             <Link href="/cart" className="text-btn" onClick={close} style={{ margin: '14px auto 0', display: 'flex', justifyContent: 'center' }}>
               View cart
             </Link>

@@ -2,13 +2,10 @@ import { CartDrawer } from '@/components/cart/CartDrawer';
 import { Footer } from '@/components/store/Footer';
 import { Header } from '@/components/store/Header';
 import { listCategories } from '@/lib/catalog';
-import { getCurrentCustomer } from '@/lib/customers';
 import { getSettings } from '@/lib/settings';
 
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
-  const settings = await getSettings();
-  const categories = await listCategories();
-  const customer = await getCurrentCustomer();
+  const [settings, categories] = await Promise.all([getSettings(), listCategories()]);
   return (
     <>
       <a href="#main" className="skip-link">
@@ -20,7 +17,6 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
         </div>
       )}
       <Header
-        signedIn={!!customer}
         categories={categories.map((c) => ({
           slug: c.slug,
           name: c.name,
@@ -29,7 +25,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
         }))}
       />
       <main id="main">{children}</main>
-      <Footer settings={settings} categories={categories} signedIn={!!customer} />
+      <Footer settings={settings} categories={categories} />
       <CartDrawer />
     </>
   );

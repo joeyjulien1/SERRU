@@ -11,7 +11,7 @@ import { Icon } from '../Icon';
 
 export type NavCategory = { slug: string; name: string; count: number; image: string | null };
 
-export function Header({ categories, signedIn }: { categories: NavCategory[]; signedIn: boolean }) {
+export function Header({ categories }: { categories: NavCategory[] }) {
   const pathname = usePathname();
   const { count, open: openCart } = useCart();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -36,7 +36,6 @@ export function Header({ categories, signedIn }: { categories: NavCategory[]; si
   }, [searchOpen]);
 
   const isActive = (href: string) => (href === '/shop' ? pathname === '/shop' : pathname.startsWith(href));
-  const accountHref = signedIn ? '/account' : '/account/login';
 
   return (
     <>
@@ -108,9 +107,6 @@ export function Header({ categories, signedIn }: { categories: NavCategory[]; si
             >
               <Icon name="search" />
             </button>
-            <Link href={accountHref} className="icon-btn header-account-link" aria-label={signedIn ? 'Your account' : 'Sign in'}>
-              <Icon name="user" />
-            </Link>
             <button type="button" className="icon-btn cart-btn" onClick={openCart} aria-label={`Open cart, ${count} items`}>
               <Icon name="bag" />
               {count > 0 && <span className="cart-btn__count">{count}</span>}
@@ -155,11 +151,6 @@ export function Header({ categories, signedIn }: { categories: NavCategory[]; si
                 </Link>
               ))}
             </div>
-          </div>
-          <div className="drawer__foot">
-            <Link href={accountHref} className="btn btn--outline btn--block">
-              <Icon name="user" size={18} /> {signedIn ? 'My account' : 'Sign in / Register'}
-            </Link>
           </div>
         </aside>
       </div>

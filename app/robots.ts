@@ -7,7 +7,7 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
   // The admin domain must never be indexed.
   if (isAdminHost(h.get('host'))) return { rules: { userAgent: '*', disallow: '/' } };
   return {
-    rules: { userAgent: '*', allow: '/', disallow: ['/account', '/checkout', '/cart', '/search', '/api/'] },
+    rules: { userAgent: '*', allow: '/', disallow: ['/cart', '/search', '/api/'] },
     sitemap: `${storeUrl()}/sitemap.xml`,
   };
 }

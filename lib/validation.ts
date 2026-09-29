@@ -35,9 +35,3 @@ export function formValues(data: FormData, omit: string[] = []): Record<string, 
   }
   return out;
 }
-
-/** Only allow same-site relative redirects such as "/account" — never "//evil.com" or "https://…". */
-export function safeNextPath(value: unknown, fallback: string): string {
-  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return fallback;
-  return value;
-}

@@ -4,10 +4,12 @@ import Link from 'next/link';
 import { useEffect } from 'react';
 import { formatMoney } from '@/lib/format';
 import { shippingFor } from '@/lib/shipping';
-import { Icon, PaymentMarks } from '../Icon';
+import { Icon } from '../Icon';
+import { PaymentMethods } from '../store/PaymentMethods';
 import { Alert } from '../ui';
 import { CartLines, FreeShippingProgress } from './CartDrawer';
 import { useCart } from './CartProvider';
+import { WhatsAppOrderButton } from './WhatsAppOrderButton';
 
 export function CartPageView() {
   const { items, subtotalCents, currency, shipping, sync, notices } = useCart();
@@ -67,12 +69,11 @@ export function CartPageView() {
                 </span>
               </div>
             </div>
-            <Link href="/checkout" className="btn btn--block btn--lg">
-              <Icon name="lock" size={16} /> Secure checkout
-            </Link>
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <PaymentMarks />
-            </div>
+            <WhatsAppOrderButton />
+            <p className="small muted" style={{ textAlign: 'center' }}>
+              Your order opens in WhatsApp so we can confirm availability and delivery with you.
+            </p>
+            <PaymentMethods tone="light" />
             <Link href="/shop" className="text-btn" style={{ justifyContent: 'center' }}>
               <Icon name="arrowLeft" size={16} /> Continue shopping
             </Link>

@@ -60,7 +60,7 @@ We obsess over the details you notice up close: clean edges, even finishes, secu
 In-stock pieces are prepared for dispatch within 3–5 business days. Made-to-order pieces show their production time on the product page.
 
 ## Delivery
-Delivery fees are calculated at checkout. Orders above the free-delivery threshold shown on the site ship free of charge.
+Delivery fees are shown in your cart and confirmed when you order. Orders above the free-delivery threshold shown on the site ship free of charge.
 
 ## Packaging
 Every piece is wrapped, corner-protected and crated or boxed according to its size and material.
@@ -71,7 +71,7 @@ You will receive an email with tracking details as soon as your order ships. You
   privacy: [
     'Privacy Policy',
     `## What we collect
-When you place an order or create an account we collect your name, email, phone number and delivery address. Card details are entered directly into our payment processor's secure form and never touch our servers.
+When you place an order we collect your name, phone number and delivery address. Payment is made by Whish Money or in cash on delivery, so we never ask for your card details.
 
 ## How we use it
 We use your information to process and deliver orders, provide customer support and — only if you opt in — send news about new pieces.
@@ -91,7 +91,7 @@ By using this website and purchasing from SERRU LAB you agree to these terms.
 Handmade pieces can vary slightly in colour, grain and finish from the photographs. These variations are part of each piece's character.
 
 ## Pricing and payment
-Prices are shown in the store currency and include all applicable charges except delivery, which is shown at checkout. Payment is taken in full when you place your order.
+Prices are shown in the store currency and include all applicable charges except delivery, which is shown in your cart. Orders are confirmed with you on WhatsApp and paid by Whish Money or in cash on delivery.
 
 ## Intellectual property
 All designs, images and content on this site belong to SERRU LAB and may not be reproduced without permission.
@@ -116,6 +116,25 @@ if (!(await one("SELECT 1 AS done FROM settings WHERE key = 'removed_refund_poli
   );
   log('refund policy page removed');
 }
+// Wording from the card-checkout days, updated in the live pages too (only these sentences change).
+const REWORDED = [
+  [
+    "Delivery fees are calculated at checkout.",
+    "Delivery fees are shown in your cart and confirmed when you order."
+  ],
+  [
+    "When you place an order or create an account we collect your name, email, phone number and delivery address. Card details are entered directly into our payment processor's secure form and never touch our servers.",
+    "When you place an order we collect your name, phone number and delivery address. Payment is made by Whish Money or in cash on delivery, so we never ask for your card details."
+  ],
+  [
+    "which is shown at checkout. Payment is taken in full when you place your order.",
+    "which is shown in your cart. Orders are confirmed with you on WhatsApp and paid by Whish Money or in cash on delivery."
+  ]
+];
+for (const [before, after] of REWORDED) {
+  await db.execute({ sql: 'UPDATE pages SET body = REPLACE(body, ?, ?) WHERE instr(body, ?) > 0', args: [before, after, before] });
+}
+await db.execute("UPDATE settings SET value = REPLACE(value, 'Secure card checkout', 'Pay with Whish or cash') WHERE key = 'marquee'");
 log('pages ready');
 
 // The announcement bar now promotes "See it on your wall". Only the untouched old default is replaced;

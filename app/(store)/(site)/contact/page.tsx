@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { Icon } from '@/components/Icon';
 import { ContactForm } from '@/components/store/ContactForm';
 import { instagramLink, whatsappLink } from '@/components/store/Footer';
-import { getCurrentCustomer } from '@/lib/customers';
 import { getSettings } from '@/lib/settings';
 
 export const metadata: Metadata = {
@@ -14,7 +13,6 @@ export const metadata: Metadata = {
 export default async function ContactPage(props: PageProps<'/contact'>) {
   const { subject } = (await props.searchParams) as { subject?: string };
   const settings = await getSettings();
-  const customer = await getCurrentCustomer();
   return (
     <div className="container">
       <header className="page-head">
@@ -82,11 +80,7 @@ export default async function ContactPage(props: PageProps<'/contact'>) {
         </div>
         <ContactForm
           defaultSubject={typeof subject === 'string' ? subject.slice(0, 120) : ''}
-          defaults={{
-            name: customer ? `${customer.firstName} ${customer.lastName}`.trim() : '',
-            email: customer?.email ?? '',
-            phone: customer?.phone ?? '',
-          }}
+          defaults={{ name: '', email: '', phone: '' }}
         />
       </div>
     </div>

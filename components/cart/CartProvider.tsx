@@ -25,6 +25,9 @@ type CartContextValue = {
   subtotalCents: number;
   currency: string;
   shipping: ShippingRules;
+  storeName: string;
+  /** WhatsApp number orders are sent to (Admin → Settings), may be empty. */
+  whatsapp: string;
   isOpen: boolean;
   open: () => void;
   close: () => void;
@@ -43,10 +46,14 @@ export function CartProvider({
   children,
   currency,
   shipping,
+  storeName,
+  whatsapp,
 }: {
   children: ReactNode;
   currency: string;
   shipping: ShippingRules;
+  storeName: string;
+  whatsapp: string;
 }) {
   const items = useSyncExternalStore(cartStore.subscribe, cartStore.getSnapshot, cartStore.getServerSnapshot);
   const [isOpen, setOpen] = useState(false);
@@ -130,6 +137,8 @@ export function CartProvider({
       subtotalCents: items.reduce((n, i) => n + i.priceCents * i.quantity, 0),
       currency,
       shipping,
+      storeName,
+      whatsapp,
       isOpen,
       open: () => setOpen(true),
       close: () => setOpen(false),
@@ -140,7 +149,7 @@ export function CartProvider({
       sync,
       notices,
     }),
-    [items, currency, shipping, isOpen, add, setQuantity, remove, clear, sync, notices],
+    [items, currency, shipping, storeName, whatsapp, isOpen, add, setQuantity, remove, clear, sync, notices],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

@@ -34,6 +34,7 @@ const PATHS = {
   grid: 'M4 4h7v7H4V4Zm9 0h7v7h-7V4ZM4 13h7v7H4v-7Zm9 0h7v7h-7v-7Z',
   receipt: 'M6 3h12v18l-3-2-3 2-3-2-3 2V3Zm3 5h6m-6 4h6m-6 4h3',
   card: 'M3 6h18v12H3V6Zm0 4h18M7 15h3',
+  cash: 'M2.5 6.5h19v11h-19v-11ZM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 9.5v.01M18 14.5v.01',
   box: 'm12 3 8.5 4.5v9L12 21l-8.5-4.5v-9L12 3Zm0 9 8.5-4.5M12 12 3.5 7.5M12 12v9',
   tag: 'M3 12V3h9l9 9-9 9-9-9Zm5-4.5h.01',
   users: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 10c.5-3.8 3.4-6 7-6s6.5 2.2 7 6m1-10a3.5 3.5 0 0 0 0-7m2.5 17c-.3-2.5-1.6-4.3-3.5-5.2',
@@ -76,35 +77,5 @@ export function Icon({ name, size = 20, strokeWidth = 1.5, ...rest }: Props) {
     >
       <path d={PATHS[name]} />
     </svg>
-  );
-}
-
-/** Card network marks used in the footer and checkout. */
-export function PaymentMarks({ height = 26 }: { height?: number }) {
-  return (
-    <span className="pay-icons" aria-label="We accept Visa and Mastercard">
-      <svg viewBox="0 0 48 30" height={height} role="img" aria-label="Visa">
-        <rect width="48" height="30" rx="4" fill="#fff" />
-        <text
-          x="24"
-          y="20"
-          textAnchor="middle"
-          fontFamily="Arial, Helvetica, sans-serif"
-          fontSize="13"
-          fontWeight="900"
-          fontStyle="italic"
-          fill="#1A1F71"
-          letterSpacing="0.5"
-        >
-          VISA
-        </text>
-      </svg>
-      <svg viewBox="0 0 48 30" height={height} role="img" aria-label="Mastercard">
-        <rect width="48" height="30" rx="4" fill="#fff" />
-        <circle cx="20" cy="15" r="8" fill="#EB001B" />
-        <circle cx="28" cy="15" r="8" fill="#F79E1B" />
-        <path d="M24 8.1a8 8 0 0 1 0 13.8 8 8 0 0 1 0-13.8Z" fill="#FF5F00" />
-      </svg>
-    </span>
   );
 }

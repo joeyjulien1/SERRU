@@ -8,7 +8,12 @@ export const dynamic = 'force-dynamic';
 export default async function StoreLayout({ children }: { children: React.ReactNode }) {
   const settings = await getSettings();
   return (
-    <CartProvider currency={settings.currency} shipping={shippingRules(settings)}>
+    <CartProvider
+      currency={settings.currency}
+      shipping={shippingRules(settings)}
+      storeName={settings.store_name}
+      whatsapp={settings.whatsapp || settings.contact_phone}
+    >
       {children}
     </CartProvider>
   );
