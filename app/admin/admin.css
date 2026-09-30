@@ -622,6 +622,14 @@
   height: 100%;
   object-fit: cover;
 }
+/* Main photo: the whole cut-out artwork on a checkerboard, so transparency is visible. */
+.adm-media[data-kind='main'] .adm-media__item {
+  background: repeating-conic-gradient(#e7ebe9 0% 25%, #fff 0% 50%) 50% / 16px 16px;
+}
+.adm-media[data-kind='main'] .adm-media__item img {
+  padding: 8px;
+  object-fit: contain;
+}
 .adm-media__item:first-child {
   outline: 2px solid var(--teal-700);
   outline-offset: -2px;

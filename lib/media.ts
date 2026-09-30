@@ -11,6 +11,8 @@ export type Media = {
   width: number;
   height: number;
   alt: string;
+  /** A product's main photo: the artwork alone, often on a transparent background — shown whole, never cropped. */
+  cutout?: boolean;
 };
 
 export type MediaRow = { id: number; file: string; thumb: string; width: number; height: number; alt: string };
@@ -43,20 +45,28 @@ export async function getMedia(id: number): Promise<Media | null> {
 }
 
 /**
- * Validates an uploaded image and stores two WebP renditions:
+ * Validates an uploaded image and stores two WebP renditions (transparency is kept):
  * a large one (max 2000px) for product pages and a thumbnail (max 720px) for grids.
+ * `trim` removes empty transparent borders, so a product's main photo is cropped to the artwork.
  */
-export async function saveUpload(input: Buffer, alt = ''): Promise<Media> {
+export async function saveUpload(input: Buffer, alt = '', options: { trim?: boolean } = {}): Promise<Media> {
   if (input.byteLength > MAX_UPLOAD_BYTES) throw new Error('Image is larger than 20 MB');
   const sharp = (await import('sharp')).default;
 
-  let format: string | undefined;
+  let meta;
   try {
-    format = (await sharp(input).metadata()).format;
+    meta = await sharp(input).metadata();
   } catch {
     throw new Error('File is not a readable image');
   }
-  if (!format || !ACCEPTED_FORMATS.has(format)) throw new Error('Unsupported image format. Use JPG, PNG or WebP.');
+  if (!meta.format || !ACCEPTED_FORMATS.has(meta.format)) throw new Error('Unsupported image format. Use JPG, PNG or WebP.');
+  if (options.trim && meta.hasAlpha) {
+    try {
+      input = await sharp(input).rotate().trim().png().toBuffer();
+    } catch {
+      // Nothing to trim (e.g. a fully opaque image) — keep it as uploaded.
+    }
+  }
 
   const now = new Date();
   const sub = `${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}`;

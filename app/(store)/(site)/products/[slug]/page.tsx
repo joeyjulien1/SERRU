@@ -34,6 +34,8 @@ export default async function ProductPage(props: PageProps<'/products/[slug]'>) 
   if (!product) notFound();
   const settings = await getSettings();
   const related = await relatedProducts(product);
+  // "See it on your wall" places the main photo (the artwork alone); older products without one use their first photo.
+  const wallArt = product.mainImage ?? product.images[0];
   const shippingNote =
     Number(settings.free_shipping_threshold_cents) > 0
       ? `Complimentary delivery on orders over ${formatMoney(Number(settings.free_shipping_threshold_cents), settings.currency)}.`
@@ -159,12 +161,8 @@ export default async function ProductPage(props: PageProps<'/products/[slug]'>) 
         </div>
       </div>
 
-      {product.images[0] && (
-        <WallPreview
-          slug={product.slug}
-          title={product.title}
-          art={{ url: product.images[0].url, width: product.images[0].width, height: product.images[0].height }}
-        />
+      {wallArt && (
+        <WallPreview slug={product.slug} title={product.title} art={{ url: wallArt.url, width: wallArt.width, height: wallArt.height }} />
       )}
 
       {related.length > 0 && (

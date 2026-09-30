@@ -36,6 +36,7 @@ export function ProductCard({
           <img
             src={first.thumbUrl}
             alt=""
+            data-cutout={first.cutout ? '' : undefined}
             width={first.width}
             height={first.height}
             loading={priority ? 'eager' : 'lazy'}

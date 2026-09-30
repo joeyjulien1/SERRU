@@ -34,7 +34,7 @@ function draftsFrom(product: ProductDetail | null): VariantDraft[] {
 /** Changes whenever a save changes what is stored, so the editor re-syncs (e.g. new sizes receive their ids). */
 function signature(product: ProductDetail | null): string {
   if (!product) return '';
-  return [product.updatedAt, product.variants.map((v) => v.id).join('.'), product.images.map((i) => i.id).join('.')].join('|');
+  return [product.updatedAt, product.variants.map((v) => v.id).join('.'), product.images.map((i) => i.id).join('.'), product.mainImage?.id].join('|');
 }
 
 export function ProductForm({
@@ -50,14 +50,16 @@ export function ProductForm({
 }) {
   const [state, action, pending] = useFormAction(saveProductAction);
   useFollowRedirect(state);
-  const [images, setImages] = useState<Media[]>(product?.images ?? []);
+  const [main, setMain] = useState<Media[]>(product?.mainImage ? [product.mainImage] : []);
+  const [previews, setPreviews] = useState<Media[]>(product?.previewImages ?? []);
   const [variants, setVariants] = useState<VariantDraft[]>(() => draftsFrom(product));
   const [madeToOrder, setMadeToOrder] = useState(product?.madeToOrder ?? false);
   const [synced, setSynced] = useState(signature(product));
   if (signature(product) !== synced) {
     setSynced(signature(product));
     setVariants(draftsFrom(product));
-    setImages(product?.images ?? []);
+    setMain(product?.mainImage ? [product.mainImage] : []);
+    setPreviews(product?.previewImages ?? []);
     setMadeToOrder(product?.madeToOrder ?? false);
   }
   const e = state.errors ?? {};
@@ -76,7 +78,8 @@ export function ProductForm({
           variants.map((row) => ({ id: row.id, label: row.label, sku: row.sku, price: row.price, compareAt: row.compareAt, stock: row.stock })),
         )}
       />
-      <input type="hidden" name="imageIds" value={JSON.stringify(images.map((i) => i.id))} />
+      <input type="hidden" name="mainImageId" value={main[0]?.id ?? ''} />
+      <input type="hidden" name="imageIds" value={JSON.stringify(previews.map((i) => i.id))} />
 
       {created && !state.message && (
         <div style={{ marginBottom: 16 }}>
@@ -135,11 +138,36 @@ export function ProductForm({
 
           <section className="adm-card">
             <div className="adm-card__head">
-              <h2 className="adm-card__title">Photos</h2>
-              <span className="adm-help">{images.length} / 20</span>
+              <h2 className="adm-card__title">Main photo</h2>
             </div>
             <div className="adm-card__body">
-              <MediaUploader value={images} onChange={setImages} label="Upload photos" />
+              <p className="adm-help" style={{ marginBottom: 12 }}>
+                The artwork on its own — cropped close, ideally a <strong>PNG with a transparent background</strong>. It is shown
+                first in the shop, and it is the piece customers place on their own wall in <strong>See it on your wall</strong>.
+                Empty edges are trimmed automatically.
+              </p>
+              <MediaUploader
+                value={main}
+                onChange={setMain}
+                multiple={false}
+                kind="main"
+                label="Upload main photo"
+                hint="Transparent PNG recommended · max 20 MB"
+              />
+            </div>
+          </section>
+
+          <section className="adm-card">
+            <div className="adm-card__head">
+              <h2 className="adm-card__title">Preview photos</h2>
+              <span className="adm-help">{previews.length} / 20</span>
+            </div>
+            <div className="adm-card__body">
+              <p className="adm-help" style={{ marginBottom: 12 }}>
+                The piece in a real space — a living room, salon or office. The first one also appears when shoppers hover
+                over the product. Use the arrows to reorder.
+              </p>
+              <MediaUploader value={previews} onChange={setPreviews} label="Upload preview photos" coverLabel={null} />
             </div>
           </section>
 
@@ -336,7 +364,7 @@ export function ProductForm({
           {product && (
             <section className="adm-card">
               <div className="adm-card__body" style={{ display: 'grid', gap: 8 }}>
-                <p className="adm-help">Deleting removes the product from the shop. Past orders keep their details.</p>
+                <p className="adm-help">Deleting removes the product from the shop.</p>
                 <ConfirmButton
                   action={deleteProductAction.bind(null, product.id)}
                   confirmText={`Delete “${product.title}”? This cannot be undone.`}

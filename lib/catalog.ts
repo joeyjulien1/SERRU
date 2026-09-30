@@ -28,12 +28,17 @@ export type ProductCard = {
   compareAtCents: number | null;
   stockLeft: number | null; // null = unlimited (at least one size has no stock limit)
   soldOut: boolean;
+  /** Everything shoppers see: the main photo first, then the preview photos. */
   images: Media[];
   variants: Variant[];
   createdAt: string;
 };
 
 export type ProductDetail = ProductCard & {
+  /** The artwork alone (cut out, often transparent) — placed on the customer's wall in "See it on your wall". */
+  mainImage: Media | null;
+  /** The piece shown in a room. */
+  previewImages: Media[];
   categoryId: number | null;
   description: string;
   materials: string;
@@ -67,6 +72,7 @@ type ProductRow = {
   made_to_order: number;
   lead_time: string;
   sales_count: number;
+  main_media_id: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -85,7 +91,7 @@ type VariantRow = {
 const PRODUCT_SELECT = `
   SELECT p.id, p.slug, p.title, p.status, p.category_id, c.slug AS category_slug, c.name AS category_name,
          p.description, p.materials, p.is_hot, p.is_one_of_one, p.made_to_order, p.lead_time,
-         p.sales_count, p.created_at, p.updated_at
+         p.sales_count, p.main_media_id, p.created_at, p.updated_at
   FROM products p
   LEFT JOIN categories c ON c.id = p.category_id`;
 
@@ -107,7 +113,8 @@ async function hydrate(rows: ProductRow[]): Promise<ProductDetail[]> {
   if (!rows.length) return [];
   const ids = rows.map((r) => r.id);
   const ph = ids.map(() => '?').join(',');
-  const [variantRows, imageRows] = await Promise.all([
+  const mainIds = rows.flatMap((r) => (r.main_media_id ? [r.main_media_id] : []));
+  const [variantRows, imageRows, mainRows] = await Promise.all([
     all<VariantRow>(
       `SELECT id, product_id, label, sku, price_cents, compare_at_cents, stock, position
        FROM variants WHERE product_id IN (${ph}) ORDER BY position, id`,
@@ -119,7 +126,11 @@ async function hydrate(rows: ProductRow[]): Promise<ProductDetail[]> {
        WHERE pi.product_id IN (${ph}) ORDER BY pi.position, m.id`,
       ...ids,
     ),
+    mainIds.length
+      ? all<MediaRow>(`SELECT id, file, thumb, width, height, alt FROM media WHERE id IN (${mainIds.map(() => '?').join(',')})`, ...mainIds)
+      : Promise.resolve([]),
   ]);
+  const mainById = new Map(mainRows.map((m) => [m.id, { ...mapMedia(m), cutout: true }]));
 
   const variantsBy = new Map<number, Variant[]>();
   for (const v of variantRows) {
@@ -136,7 +147,9 @@ async function hydrate(rows: ProductRow[]): Promise<ProductDetail[]> {
 
   return rows.map((r) => {
     const variants = variantsBy.get(r.id) ?? [];
-    const images = imagesBy.get(r.id) ?? [];
+    const mainImage = (r.main_media_id && mainById.get(r.main_media_id)) || null;
+    const previewImages = (imagesBy.get(r.id) ?? []).filter((m) => m.id !== mainImage?.id);
+    const images = mainImage ? [mainImage, ...previewImages] : previewImages;
     const available = variants.filter((v) => v.stock === null || v.stock > 0);
     const pricing = available.length ? available : variants;
     const cheapest = pricing.reduce<Variant | null>((min, v) => (!min || v.priceCents < min.priceCents ? v : min), null);
@@ -164,6 +177,8 @@ async function hydrate(rows: ProductRow[]): Promise<ProductDetail[]> {
       stockLeft,
       soldOut: variants.length === 0 || (!unlimited && stockLeft === 0),
       images,
+      mainImage,
+      previewImages,
       variants,
       createdAt: r.created_at,
       updatedAt: r.updated_at,

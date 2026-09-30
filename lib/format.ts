@@ -55,10 +55,6 @@ export function formatDate(value: string, withTime = false): string {
   });
 }
 
-export function orderLabel(number: number): string {
-  return `#SL${number}`;
-}
-
 export function pluralize(n: number, one: string, many = one + 's'): string {
   return `${n} ${n === 1 ? one : many}`;
 }

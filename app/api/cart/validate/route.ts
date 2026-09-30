@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { priceCart } from '@/lib/orders';
+import { priceCart } from '@/lib/cart';
 
 const body = z.object({
   lines: z

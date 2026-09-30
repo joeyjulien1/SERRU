@@ -53,19 +53,12 @@ async function renderPreview(photo: Photo, rect: Rect, artUrl: string): Promise<
   const y = rect.y * canvas.height;
   const w = rect.w * canvas.width;
   const h = rect.h * canvas.height;
-  // Soft shadow on the wall, as on screen.
-  ctx.save();
+  // The artwork with a soft shadow on the wall. Canvas shadows follow the image's own shape,
+  // so a transparent cut-out casts a shadow only where the piece is, as on screen.
   ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-  ctx.shadowBlur = Math.max(8, w * 0.06);
+  ctx.shadowBlur = Math.max(8, w * 0.05);
   ctx.shadowOffsetY = Math.max(3, h * 0.025);
-  ctx.fillStyle = '#000';
-  ctx.fillRect(x, y, w, h);
-  ctx.restore();
-  // The artwork, cropped like `object-fit: cover`.
-  const s = Math.max(w / piece.naturalWidth, h / piece.naturalHeight);
-  const sw = w / s;
-  const sh = h / s;
-  ctx.drawImage(piece, (piece.naturalWidth - sw) / 2, (piece.naturalHeight - sh) / 2, sw, sh, x, y, w, h);
+  ctx.drawImage(piece, x, y, w, h);
   return toJpeg(canvas);
 }
 

@@ -6,16 +6,12 @@ import { z } from 'zod';
 import { requireAdmin } from '@/lib/admin-auth';
 import { isCountryCode } from '@/lib/countries';
 import { all, get, run, tx } from '@/lib/db';
-import { CURRENCIES, formatMoney, orderLabel, parseMoneyToCents, slugify } from '@/lib/format';
-import { storeUrl } from '@/lib/hosts';
-import { sendMail } from '@/lib/mailer';
-import { getOrder, markOrderPaid, recordRefund, updateFulfillment, FULFILLMENT_STATUSES, type FulfillmentStatus } from '@/lib/orders';
+import { CURRENCIES, parseMoneyToCents, slugify } from '@/lib/format';
 import { savePage } from '@/lib/pages';
 import { dummyPasswordHash, hashPassword, PASSWORD_MIN, verifyPassword } from '@/lib/password';
-import { createTapRefund } from '@/lib/payments';
 import { clientIp, rateLimit } from '@/lib/rate-limit';
 import { createSession, destroyAllSessions, destroySession } from '@/lib/session';
-import { getSettings, saveSettings, SETTING_DEFAULTS, type SettingKey } from '@/lib/settings';
+import { saveSettings, SETTING_DEFAULTS, type SettingKey } from '@/lib/settings';
 import { EMAIL_PATTERN, fieldErrors, formValues, type ActionResult, type FormState } from '@/lib/validation';
 
 const str = (v: FormDataEntryValue | null) => (typeof v === 'string' ? v.trim() : '');
@@ -126,7 +122,11 @@ export async function saveProductAction(_: FormState, data: FormData): Promise<F
   const validImageIds = imageIds.data.length
     ? (await all<{ id: number }>(`SELECT id FROM media WHERE id IN (${imageIds.data.map(() => '?').join(',')})`, ...imageIds.data)).map((r) => r.id)
     : [];
-  const orderedImages = imageIds.data.filter((m) => validImageIds.includes(m));
+  const mainImageId = Number(str(data.get('mainImageId'))) || null;
+  if (mainImageId && !(await get('SELECT id FROM media WHERE id = ?', mainImageId))) {
+    return { ok: false, message: 'The main photo was not found. Please upload it again.', values };
+  }
+  const orderedImages = imageIds.data.filter((m) => validImageIds.includes(m) && m !== mainImageId);
 
   const categoryId = Number(base.data.categoryId) || null;
   if (categoryId && !(await get('SELECT id FROM categories WHERE id = ?', categoryId))) {
@@ -150,7 +150,7 @@ export async function saveProductAction(_: FormState, data: FormData): Promise<F
     if (pid) {
       const res = await run(
         `UPDATE products SET title = ?, slug = ?, category_id = ?, description = ?, materials = ?, status = ?,
-           is_hot = ?, is_one_of_one = ?, made_to_order = ?, lead_time = ?, updated_at = datetime('now') WHERE id = ?`,
+           is_hot = ?, is_one_of_one = ?, made_to_order = ?, lead_time = ?, main_media_id = ?, updated_at = datetime('now') WHERE id = ?`,
         base.data.title,
         slug,
         categoryId,
@@ -161,14 +161,15 @@ export async function saveProductAction(_: FormState, data: FormData): Promise<F
         flags.ooo,
         flags.mto,
         base.data.leadTime,
+        mainImageId,
         pid,
       );
       if (res.changes === 0) throw new Error('Product not found');
     } else {
       pid = (
         await run(
-          `INSERT INTO products (title, slug, category_id, description, materials, status, is_hot, is_one_of_one, made_to_order, lead_time)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO products (title, slug, category_id, description, materials, status, is_hot, is_one_of_one, made_to_order, lead_time, main_media_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           base.data.title,
           slug,
           categoryId,
@@ -179,6 +180,7 @@ export async function saveProductAction(_: FormState, data: FormData): Promise<F
           flags.ooo,
           flags.mto,
           base.data.leadTime,
+          mainImageId,
         )
       ).lastId;
     }
@@ -310,118 +312,6 @@ export async function deleteCategoryAction(id: number): Promise<ActionResult> {
     await run('DELETE FROM categories WHERE id = ?', id);
   });
   return { redirectTo: '/categories?deleted=1' };
-}
-
-// ───────────── Orders ─────────────
-
-export async function updateOrderAction(_: FormState, data: FormData): Promise<FormState> {
-  await requireAdmin();
-  const id = Number(str(data.get('id')));
-  const order = await getOrder(id);
-  if (!order) return { ok: false, message: 'Order not found.' };
-  const status = str(data.get('fulfillment')) as FulfillmentStatus;
-  if (!FULFILLMENT_STATUSES.includes(status)) return { ok: false, message: 'Choose a status.' };
-  const tracking = str(data.get('tracking')).slice(0, 120);
-  const note = str(data.get('note')).slice(0, 2000);
-  const restock = bool(data.get('restock'));
-  const codDue = order.paymentProvider === 'cod' && order.paymentStatus === 'pending';
-  if ((status === 'shipped' || status === 'delivered') && order.paymentStatus !== 'paid' && !codDue) {
-    return { ok: false, message: 'Only paid or cash-on-delivery orders can be shipped.' };
-  }
-
-  await updateFulfillment(id, status, tracking, note, restock);
-
-  const notify = bool(data.get('notify'));
-  if (notify && status !== order.fulfillmentStatus && (status === 'shipped' || status === 'delivered')) {
-    const settings = await getSettings();
-    await sendMail({
-      to: order.email,
-      subject:
-        status === 'shipped'
-          ? `Your ${settings.store_name} order ${orderLabel(order.number)} is on its way`
-          : `Your ${settings.store_name} order ${orderLabel(order.number)} was delivered`,
-      text: `Hi ${order.shipName.split(' ')[0]},\n\n${
-        status === 'shipped'
-          ? `Good news — your order ${orderLabel(order.number)} has shipped.${tracking ? `\nTracking number: ${tracking}` : ''}`
-          : `Your order ${orderLabel(order.number)} has been delivered. We hope you love it.`
-      }\n\nView your order: ${storeUrl()}/checkout/success/${order.number}?token=${order.token}\n\n${settings.store_name}`,
-    });
-  }
-  refresh();
-  return { ok: true, message: 'Order updated.' };
-}
-
-export async function refundOrderAction(_: FormState, data: FormData): Promise<FormState> {
-  await requireAdmin('owner');
-  const id = Number(str(data.get('id')));
-  const order = await getOrder(id);
-  if (!order || order.paymentStatus !== 'paid') return { ok: false, message: 'Only paid orders can be refunded.' };
-  const restock = bool(data.get('restock'));
-
-  let ref: string;
-  let message = 'Refunded from admin';
-  if (order.paymentProvider === 'tap') {
-    if (!order.paymentRef) return { ok: false, message: 'This order has no Tap payment to refund.' };
-    try {
-      const refund = await createTapRefund({
-        chargeId: order.paymentRef,
-        amountCents: order.totalCents,
-        currency: order.currency,
-        orderNumber: order.number,
-      });
-      const status = String(refund.status).toUpperCase();
-      if (status !== 'REFUNDED' && status !== 'PENDING') {
-        return { ok: false, message: `Tap did not accept the refund (${status}${refund.response?.message ? `: ${refund.response.message}` : ''}).` };
-      }
-      ref = refund.id;
-      if (status === 'PENDING') message = 'Refund submitted to Tap (processing)';
-    } catch (err) {
-      console.error('[admin] refund failed', err);
-      return { ok: false, message: err instanceof Error ? `Tap refused the refund: ${err.message}` : 'Refund failed.' };
-    }
-  } else if (order.paymentProvider === 'cod') {
-    ref = `cash_refund_${order.number}`;
-    message = 'Cash refund recorded';
-  } else {
-    ref = `test_refund_${order.number}`;
-  }
-
-  await recordRefund(
-    order.id,
-    { provider: order.paymentProvider, ref, amountCents: order.totalCents, currency: order.currency, message },
-    restock,
-  );
-  const settings = await getSettings();
-  await sendMail({
-    to: order.email,
-    subject: `Refund for ${settings.store_name} order ${orderLabel(order.number)}`,
-    text:
-      `Hi ${order.shipName.split(' ')[0]},\n\n` +
-      (order.paymentProvider === 'cod'
-        ? `We've refunded ${formatMoney(order.totalCents, order.currency)} for order ${orderLabel(order.number)}.`
-        : `We've refunded ${formatMoney(order.totalCents, order.currency)} for order ${orderLabel(order.number)} to your original payment card. Depending on your bank it can take 5–10 business days to appear.`) +
-      `\n\n${settings.store_name}`,
-  });
-  refresh();
-  return { ok: true, message: order.paymentProvider === 'cod' ? 'Refund recorded.' : 'Refund issued.' };
-}
-
-/** Cash-on-delivery order: the courier collected the cash. */
-export async function markCodPaidAction(orderId: number): Promise<ActionResult> {
-  await requireAdmin();
-  const order = await getOrder(orderId);
-  if (!order || order.paymentProvider !== 'cod') return { error: 'This is not a cash-on-delivery order.' };
-  if (order.paymentStatus !== 'pending') return { error: 'This order is not awaiting payment.' };
-  if (order.fulfillmentStatus === 'cancelled') return { error: 'This order was cancelled.' };
-  await markOrderPaid(order.id, {
-    provider: 'cod',
-    ref: `cash_${order.number}`,
-    amountCents: order.totalCents,
-    currency: order.currency,
-    message: 'Cash collected on delivery',
-  });
-  refresh();
-  return undefined;
 }
 
 // ───────────── Inbox ─────────────

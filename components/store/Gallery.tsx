@@ -51,6 +51,7 @@ export function Gallery({ images, title, fallbackSlug }: { images: Media[]; titl
               <img
                 src={img.url}
                 alt={img.alt || `${title} — image ${i + 1}`}
+                data-cutout={img.cutout ? '' : undefined}
                 width={img.width}
                 height={img.height}
                 loading={i === 0 ? 'eager' : 'lazy'}

@@ -1,52 +1,25 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { PageHead } from '@/components/admin/parts';
-import { RevenueChart } from '@/components/admin/RevenueChart';
 import { Icon } from '@/components/Icon';
-import { Alert, StatusPill } from '@/components/ui';
+import { Alert } from '@/components/ui';
 import { requireAdminPage } from '@/lib/admin-auth';
-import { dashboardStats, lowStock, revenueByDay, topProducts } from '@/lib/admin-data';
-import { sweepStaleOrders } from '@/lib/checkout';
-import { formatDate, formatMoney, orderLabel } from '@/lib/format';
-import { codDue, listOrders } from '@/lib/orders';
-import { paymentMode } from '@/lib/payments';
+import { listMessages, lowStock, overview } from '@/lib/admin-data';
+import { formatDate } from '@/lib/format';
 import { getSettings } from '@/lib/settings';
 
 export const metadata: Metadata = { title: 'Dashboard' };
 
-function Delta({ now, prev }: { now: number; prev: number }) {
-  if (prev === 0) return <span className="adm-kpi__sub">vs previous 30 days: —</span>;
-  const pct = Math.round(((now - prev) / prev) * 100);
-  const up = pct >= 0;
-  return (
-    <span className="adm-kpi__sub" style={{ color: up ? 'var(--success)' : 'var(--danger)' }}>
-      <Icon name={up ? 'arrowUp' : 'arrowDown'} size={12} style={{ display: 'inline', verticalAlign: '-1px' }} /> {Math.abs(pct)}% vs previous
-      30 days
-    </span>
-  );
-}
-
 export default async function DashboardPage() {
   const admin = await requireAdminPage();
-  await sweepStaleOrders();
-  const [settings, stats, cod, series, recent, top, low] = await Promise.all([
-    getSettings(),
-    dashboardStats(),
-    codDue(),
-    revenueByDay(30),
-    listOrders({ limit: 6 }).then((r) => r.items),
-    topProducts(),
-    lowStock(),
-  ]);
-  const currency = settings.currency;
-  const mode = paymentMode();
-  const aov = stats.orders30 ? Math.round(stats.revenue30 / stats.orders30) : 0;
+  const [settings, stats, messages, low] = await Promise.all([getSettings(), overview(), listMessages(), lowStock()]);
+  const latest = messages.slice(0, 5);
 
   return (
     <>
       <PageHead
         title="Dashboard"
-        description={`Welcome back, ${admin.name}. Here's how the store is doing over the last 30 days.`}
+        description={`Welcome back, ${admin.name}. Orders arrive on WhatsApp — here is your shop at a glance.`}
         actions={
           <Link href="/products/new" className="btn">
             <Icon name="plus" size={16} /> Add product
@@ -54,54 +27,43 @@ export default async function DashboardPage() {
         }
       />
 
-      {mode !== 'tap' && (
+      {!settings.whatsapp && !settings.contact_phone && (
         <div style={{ marginBottom: 16 }}>
           <Alert tone="warning">
-            {mode === 'test' ? (
-              <>
-                <strong>Card payments are in test mode.</strong> Customers can only pay with test cards. Add your Tap secret key to{' '}
-                <span className="adm-code">.env.local</span> to accept real Visa and Mastercard payments.
-              </>
-            ) : (
-              <>
-                <strong>Card payments are switched off.</strong> Add your Tap secret key to the server environment to accept cards
-                {settings.cod_enabled === '1' ? ' — cash on delivery still works.' : '.'}
-              </>
-            )}
+            <strong>Add your WhatsApp number.</strong> The cart sends orders to it — until it is set, customers are sent to the
+            contact form instead. <Link href="/settings">Open settings</Link>
           </Alert>
         </div>
       )}
 
       <div className="adm-kpis">
-        <div className="adm-card adm-kpi">
+        <Link href="/products?status=active" className="adm-card adm-kpi">
           <span className="adm-kpi__label">
-            <Icon name="card" size={16} /> Revenue
+            <Icon name="box" size={16} /> Live products
           </span>
-          <span className="adm-kpi__value">{formatMoney(stats.revenue30, currency)}</span>
-          <Delta now={stats.revenue30} prev={stats.revenuePrev30} />
-        </div>
-        <div className="adm-card adm-kpi">
+          <span className="adm-kpi__value">{stats.activeProducts}</span>
+          <span className="adm-kpi__sub">Visible in the shop</span>
+        </Link>
+        <Link href="/products" className="adm-card adm-kpi">
           <span className="adm-kpi__label">
-            <Icon name="receipt" size={16} /> Paid orders
+            <Icon name="eye" size={16} /> Hidden
           </span>
-          <span className="adm-kpi__value">{stats.orders30}</span>
-          <Delta now={stats.orders30} prev={stats.ordersPrev30} />
-        </div>
-        <div className="adm-card adm-kpi">
+          <span className="adm-kpi__value">{stats.hiddenProducts}</span>
+          <span className="adm-kpi__sub">Drafts and archived</span>
+        </Link>
+        <Link href="/categories" className="adm-card adm-kpi">
           <span className="adm-kpi__label">
-            <Icon name="tag" size={16} /> Average order
+            <Icon name="tag" size={16} /> Categories
           </span>
-          <span className="adm-kpi__value">{formatMoney(aov, currency)}</span>
-          <span className="adm-kpi__sub">Refunded: {formatMoney(stats.refunds30, currency)}</span>
-        </div>
-        <Link href="/orders?view=to-fulfil" className="adm-card adm-kpi">
+          <span className="adm-kpi__value">{stats.categories}</span>
+          <span className="adm-kpi__sub">Collections in the menu</span>
+        </Link>
+        <Link href="/inbox" className="adm-card adm-kpi">
           <span className="adm-kpi__label">
-            <Icon name="truck" size={16} /> To fulfil
+            <Icon name="inbox" size={16} /> Unread messages
           </span>
-          <span className="adm-kpi__value">{stats.toFulfil}</span>
-          <span className="adm-kpi__sub">
-            {cod.count > 0 ? `Cash to collect: ${formatMoney(cod.cents, currency)}` : `${stats.customers} customers · ${stats.newCustomers30} new`}
-          </span>
+          <span className="adm-kpi__value">{stats.unreadMessages}</span>
+          <span className="adm-kpi__sub">{stats.subscribers} newsletter subscribers</span>
         </Link>
       </div>
 
@@ -109,89 +71,38 @@ export default async function DashboardPage() {
         <div className="adm-stack">
           <section className="adm-card">
             <div className="adm-card__head">
-              <h2 className="adm-card__title">Daily revenue — last 30 days</h2>
-            </div>
-            <div className="adm-card__body">
-              <RevenueChart data={series} currency={currency} />
-            </div>
-          </section>
-
-          <section className="adm-card">
-            <div className="adm-card__head">
-              <h2 className="adm-card__title">Recent orders</h2>
-              <Link href="/orders" className="small link">
-                View all
+              <h2 className="adm-card__title">Latest messages</h2>
+              <Link href="/inbox" className="small link">
+                Open inbox
               </Link>
             </div>
-            <div className="adm-card__body" style={{ padding: 0, marginTop: 12 }}>
-              {recent.length === 0 ? (
+            <div className="adm-card__body">
+              {latest.length === 0 ? (
                 <div className="adm-empty">
-                  <Icon name="receipt" size={32} strokeWidth={1.3} />
-                  No orders yet. They will appear here as soon as customers check out.
+                  <Icon name="inbox" size={32} strokeWidth={1.3} />
+                  No messages yet. Enquiries from the contact page will appear here.
                 </div>
               ) : (
-                <div className="adm-table-wrap">
-                  <table className="adm-table">
-                    <thead>
-                      <tr>
-                        <th>Order</th>
-                        <th>Customer</th>
-                        <th>Payment</th>
-                        <th>Fulfillment</th>
-                        <th className="num">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {recent.map((o) => (
-                        <tr key={o.id}>
-                          <td className="nowrap">
-                            <Link href={`/orders/${o.id}`} className="row-link">
-                              {orderLabel(o.number)}
-                            </Link>
-                            <div className="tiny muted">{formatDate(o.createdAt, true)}</div>
-                          </td>
-                          <td>{o.shipName}</td>
-                          <td>
-                            <StatusPill value={o.paymentStatus} label={o.paymentProvider === 'cod' && o.paymentStatus === 'pending' ? 'cash due' : undefined} />
-                          </td>
-                          <td>
-                            <StatusPill value={o.fulfillmentStatus} />
-                          </td>
-                          <td className="num">{formatMoney(o.totalCents, o.currency)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <ul className="adm-dl" style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+                  {latest.map((m) => (
+                    <li key={m.id} style={{ display: 'grid', gap: 2 }}>
+                      <span style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                        <Link href="/inbox" style={{ fontWeight: m.isRead ? 400 : 600 }}>
+                          {m.name}
+                          {m.subject ? <span className="muted"> · {m.subject}</span> : null}
+                        </Link>
+                        <span className="tiny muted nowrap">{formatDate(m.createdAt, true)}</span>
+                      </span>
+                      <span className="small muted">{m.body.length > 140 ? `${m.body.slice(0, 140)}…` : m.body}</span>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
           </section>
         </div>
 
         <div className="adm-stack">
-          <section className="adm-card">
-            <div className="adm-card__head">
-              <h2 className="adm-card__title">Top sellers (90 days)</h2>
-            </div>
-            <div className="adm-card__body">
-              {top.length === 0 ? (
-                <p className="adm-help">Best-selling pieces will show here after your first sales.</p>
-              ) : (
-                <ol className="adm-dl" style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-                  {top.map((t) => (
-                    <li key={t.title} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                      <span>
-                        {t.productId ? <Link href={`/products/${t.productId}`}>{t.title}</Link> : t.title}
-                        <span className="tiny muted"> · {t.units} sold</span>
-                      </span>
-                      <span>{formatMoney(t.cents, currency)}</span>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </div>
-          </section>
-
           <section className="adm-card">
             <div className="adm-card__head">
               <h2 className="adm-card__title">Low stock</h2>
@@ -224,8 +135,8 @@ export default async function DashboardPage() {
               <Link href="/products/new" className="btn btn--outline btn--block">
                 <Icon name="upload" size={16} /> Upload a new piece
               </Link>
-              <Link href="/transactions" className="btn btn--outline btn--block">
-                <Icon name="card" size={16} /> Card transactions
+              <Link href="/pages" className="btn btn--outline btn--block">
+                <Icon name="file" size={16} /> Edit pages
               </Link>
               <Link href="/settings" className="btn btn--outline btn--block">
                 <Icon name="settings" size={16} /> Store settings

@@ -21,9 +21,14 @@ async function shrinkForUpload(file: File): Promise<File> {
     canvas.height = Math.round(bitmap.height * scale);
     canvas.getContext('2d')?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close();
+    // PNG / WebP may be transparent (a product's cut-out main photo): keep the alpha channel with WebP.
+    const type = /png|webp|gif|avif/.test(file.type) ? 'image/webp' : 'image/jpeg';
     for (const quality of [0.9, 0.8, 0.7]) {
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
-      if (blob && blob.size <= SEND_LIMIT) return new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' });
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality));
+      if (blob && blob.size <= SEND_LIMIT) {
+        const ext = blob.type === 'image/webp' ? '.webp' : blob.type === 'image/png' ? '.png' : '.jpg';
+        return new File([blob], file.name.replace(/\.\w+$/, '') + ext, { type: blob.type });
+      }
     }
   } catch {
     // The browser cannot decode this format — send the original and let the server decide.
@@ -37,12 +42,20 @@ export function MediaUploader({
   multiple = true,
   max = 20,
   label = 'Add images',
+  hint = 'JPG, PNG or WebP · max 20 MB',
+  kind,
+  coverLabel = 'Cover',
 }: {
   value: Media[];
   onChange: Dispatch<SetStateAction<Media[]>>;
   multiple?: boolean;
   max?: number;
   label?: string;
+  hint?: string;
+  /** 'main': a product's cut-out artwork photo — the server trims its transparent border. */
+  kind?: 'main';
+  /** Badge on the first image (multiple mode); null for none. */
+  coverLabel?: string | null;
 }) {
   const inputId = useId();
   const input = useRef<HTMLInputElement>(null);
@@ -66,6 +79,7 @@ export function MediaUploader({
       try {
         const body = new FormData();
         body.append('file', await shrinkForUpload(file), file.name);
+        if (kind) body.append('kind', kind);
         const res = await fetch('/api/admin/upload', { method: 'POST', body });
         const data = (await res.json().catch(() => ({}))) as Media & { error?: string };
         if (res.status === 413) problems.push(`${file.name} is too large to upload. Save it as a smaller JPG and try again.`);
@@ -104,11 +118,11 @@ export function MediaUploader({
           </Alert>
         </div>
       )}
-      <div className="adm-media" style={multiple ? undefined : { gridTemplateColumns: 'minmax(120px, 200px)' }}>
+      <div className="adm-media" data-kind={kind} style={multiple ? undefined : { gridTemplateColumns: 'minmax(120px, 200px)' }}>
         {value.map((m, i) => (
           <div className="adm-media__item" key={m.id}>
             <img src={m.thumbUrl} alt={m.alt || ''} />
-            {multiple && i === 0 && <span className="adm-media__cover">Cover</span>}
+            {multiple && coverLabel && i === 0 && <span className="adm-media__cover">{coverLabel}</span>}
             <div className="adm-media__tools">
               {multiple ? (
                 <span style={{ display: 'flex', gap: 4 }}>
@@ -154,7 +168,7 @@ export function MediaUploader({
             <span style={{ display: 'grid', justifyItems: 'center', gap: 6 }}>
               <Icon name="upload" size={22} />
               {!multiple && value.length > 0 ? 'Replace image' : label}
-              <span className="tiny">JPG, PNG or WebP · max 20 MB</span>
+              <span className="tiny">{hint}</span>
             </span>
           </label>
         )}

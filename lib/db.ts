@@ -39,10 +39,21 @@ async function open(): Promise<Client> {
 }
 
 /**
- * Upgrades databases created by earlier versions. Returns true when anything changed.
+ * Upgrades databases created by earlier versions. Returns true when a table was rebuilt.
  * v2: orders.payment_provider accepts 'tap' and 'cod' (was 'stripe' / 'test').
  */
 async function migrate(client: Client): Promise<boolean> {
+  // v3: products.main_media_id (the cut-out artwork photo).
+  const productColumns = (await client.execute('PRAGMA table_info(products)')).rows.map((c) => String(c.name));
+  if (!productColumns.includes('main_media_id')) {
+    await client
+      .execute('ALTER TABLE products ADD COLUMN main_media_id INTEGER REFERENCES media(id) ON DELETE SET NULL')
+      .catch((err) => {
+        // Another server instance added it at the same moment.
+        if (!/duplicate column/i.test(String(err))) throw err;
+      });
+  }
+
   const row = (await client.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'orders'")).rows[0];
   if (!row || typeof row.sql !== 'string' || row.sql.includes("'cod'")) return false;
 

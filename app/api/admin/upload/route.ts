@@ -17,7 +17,8 @@ export async function POST(request: Request) {
 
   const alt = typeof form.get('alt') === 'string' ? String(form.get('alt')).slice(0, 200) : '';
   try {
-    const media = await saveUpload(Buffer.from(await file.arrayBuffer()), alt);
+    // A product's main photo is the artwork alone: crop away any empty transparent border.
+    const media = await saveUpload(Buffer.from(await file.arrayBuffer()), alt, { trim: form.get('kind') === 'main' });
     return Response.json(media);
   } catch (err) {
     return Response.json({ error: err instanceof Error ? `${file.name}: ${err.message}` : 'Upload failed.' }, { status: 422 });

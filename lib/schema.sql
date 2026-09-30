@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS products (
   made_to_order  INTEGER NOT NULL DEFAULT 0,
   lead_time      TEXT    NOT NULL DEFAULT '',
   sales_count    INTEGER NOT NULL DEFAULT 0,
+  main_media_id  INTEGER REFERENCES media(id) ON DELETE SET NULL, -- the artwork alone (cut out), used for "See it on your wall"
   created_at     TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at     TEXT    NOT NULL DEFAULT (datetime('now'))
 );

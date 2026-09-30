@@ -7,13 +7,10 @@ import { adminLogoutAction } from '@/app/admin/actions';
 import { useOverlay } from '../hooks';
 import { Icon, type IconName } from '../Icon';
 
-const NAV: { href: string; label: string; icon: IconName; count?: 'orders' | 'inbox' }[] = [
+const NAV: { href: string; label: string; icon: IconName; count?: 'inbox' }[] = [
   { href: '/', label: 'Dashboard', icon: 'grid' },
-  { href: '/orders', label: 'Orders', icon: 'receipt', count: 'orders' },
-  { href: '/transactions', label: 'Transactions', icon: 'card' },
   { href: '/products', label: 'Products', icon: 'box' },
   { href: '/categories', label: 'Categories', icon: 'tag' },
-  { href: '/customers', label: 'Customers', icon: 'users' },
   { href: '/inbox', label: 'Inbox', icon: 'inbox', count: 'inbox' },
   { href: '/pages', label: 'Pages', icon: 'file' },
   { href: '/settings', label: 'Settings', icon: 'settings' },
@@ -26,7 +23,7 @@ export function AdminShell({
   children,
 }: {
   admin: { name: string; email: string; role: string };
-  counts: { orders: number; inbox: number };
+  counts: { inbox: number };
   storeUrl: string;
   children: React.ReactNode;
 }) {
