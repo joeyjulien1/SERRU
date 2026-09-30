@@ -132,7 +132,7 @@ export function CartDrawer() {
                 <span>{shippingCents === 0 ? 'Complimentary' : formatMoney(shippingCents, currency)}</span>
               </div>
             </div>
-            <WhatsAppOrderButton showTotal onNavigate={close} />
+            <WhatsAppOrderButton showTotal />
             <p className="tiny muted" style={{ marginTop: 10, textAlign: 'center' }}>
               Pay with Whish Money or cash on delivery.
             </p>

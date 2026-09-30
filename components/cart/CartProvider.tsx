@@ -26,6 +26,8 @@ type CartContextValue = {
   currency: string;
   shipping: ShippingRules;
   storeName: string;
+  /** Public address of the store, for product links in WhatsApp orders. */
+  storeUrl: string;
   /** WhatsApp number orders are sent to (Admin → Settings), may be empty. */
   whatsapp: string;
   isOpen: boolean;
@@ -47,12 +49,14 @@ export function CartProvider({
   currency,
   shipping,
   storeName,
+  storeUrl,
   whatsapp,
 }: {
   children: ReactNode;
   currency: string;
   shipping: ShippingRules;
   storeName: string;
+  storeUrl: string;
   whatsapp: string;
 }) {
   const items = useSyncExternalStore(cartStore.subscribe, cartStore.getSnapshot, cartStore.getServerSnapshot);
@@ -138,6 +142,7 @@ export function CartProvider({
       currency,
       shipping,
       storeName,
+      storeUrl,
       whatsapp,
       isOpen,
       open: () => setOpen(true),
@@ -149,7 +154,7 @@ export function CartProvider({
       sync,
       notices,
     }),
-    [items, currency, shipping, storeName, whatsapp, isOpen, add, setQuantity, remove, clear, sync, notices],
+    [items, currency, shipping, storeName, storeUrl, whatsapp, isOpen, add, setQuantity, remove, clear, sync, notices],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

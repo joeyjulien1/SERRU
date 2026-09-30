@@ -1,4 +1,5 @@
 import { CartProvider } from '@/components/cart/CartProvider';
+import { storeUrl } from '@/lib/hosts';
 import { getSettings, shippingRules } from '@/lib/settings';
 import './store.css';
 
@@ -12,6 +13,7 @@ export default async function StoreLayout({ children }: { children: React.ReactN
       currency={settings.currency}
       shipping={shippingRules(settings)}
       storeName={settings.store_name}
+      storeUrl={storeUrl()}
       whatsapp={settings.whatsapp || settings.contact_phone}
     >
       {children}
