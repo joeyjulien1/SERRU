@@ -21,7 +21,7 @@ export const SETTING_DEFAULTS = {
   contact_email: '',
   contact_phone: '',
   whatsapp: '',
-  instagram: '',
+  instagram: 'https://www.instagram.com/serrustudio/',
   address: '',
 } as const;
 

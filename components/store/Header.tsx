@@ -4,6 +4,7 @@ import Form from 'next/form';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { BrandIcon } from '../BrandIcon';
 import { useCart } from '../cart/CartProvider';
 import { CategoryArt } from '../CategoryArt';
 import { useOverlay } from '../hooks';
@@ -11,7 +12,16 @@ import { Icon } from '../Icon';
 
 export type NavCategory = { slug: string; name: string; count: number; image: string | null };
 
-export function Header({ categories }: { categories: NavCategory[] }) {
+export function Header({
+  categories,
+  instagramUrl,
+  whatsappUrl,
+}: {
+  categories: NavCategory[];
+  instagramUrl: string | null;
+  /** wa.me link, or null until a WhatsApp number is set (the icon then opens the contact page). */
+  whatsappUrl: string | null;
+}) {
   const pathname = usePathname();
   const { count, open: openCart } = useCart();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -107,6 +117,20 @@ export function Header({ categories }: { categories: NavCategory[] }) {
             >
               <Icon name="search" />
             </button>
+            {instagramUrl && (
+              <a href={instagramUrl} target="_blank" rel="noopener noreferrer" className="icon-btn header-social" aria-label="SERRU LAB on Instagram">
+                <BrandIcon name="instagram" size={19} />
+              </a>
+            )}
+            {whatsappUrl ? (
+              <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="icon-btn header-social" aria-label="Chat with us on WhatsApp">
+                <BrandIcon name="whatsapp" size={19} />
+              </a>
+            ) : (
+              <Link href="/contact" className="icon-btn header-social" aria-label="Contact us">
+                <BrandIcon name="whatsapp" size={19} />
+              </Link>
+            )}
             <button type="button" className="icon-btn cart-btn" onClick={openCart} aria-label={`Open cart, ${count} items`}>
               <Icon name="bag" />
               {count > 0 && <span className="cart-btn__count">{count}</span>}

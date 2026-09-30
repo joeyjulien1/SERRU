@@ -3,7 +3,7 @@
 import type { MouseEvent } from 'react';
 import { formatMoney } from '@/lib/format';
 import { shippingFor } from '@/lib/shipping';
-import { Icon } from '../Icon';
+import { BrandIcon } from '../BrandIcon';
 import { useCart } from './CartProvider';
 
 /**
@@ -50,7 +50,7 @@ export function WhatsAppOrderButton({ label = 'Proceed on WhatsApp', showTotal =
 
   const content = (
     <>
-      <Icon name="whatsapp" size={18} /> {label}
+      <BrandIcon name="whatsapp" size={18} /> {label}
       {showTotal && ` · ${money(totalCents)}`}
     </>
   );

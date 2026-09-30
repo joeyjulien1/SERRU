@@ -2,7 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Icon } from '@/components/Icon';
 import { ContactForm } from '@/components/store/ContactForm';
-import { instagramLink, whatsappLink } from '@/components/store/Footer';
+import { BrandIcon } from '@/components/BrandIcon';
+import { instagramHandle, instagramLink, whatsappLink } from '@/lib/social';
 import { getSettings } from '@/lib/settings';
 
 export const metadata: Metadata = {
@@ -33,10 +34,19 @@ export default async function ContactPage(props: PageProps<'/contact'>) {
           <div className="contact-methods">
             {settings.whatsapp && (
               <a className="contact-method" href={whatsappLink(settings.whatsapp)} target="_blank" rel="noopener noreferrer">
-                <Icon name="whatsapp" size={24} />
+                <BrandIcon name="whatsapp" size={24} />
                 <span>
                   <small>WhatsApp</small>
                   {settings.whatsapp}
+                </span>
+              </a>
+            )}
+            {settings.instagram && (
+              <a className="contact-method" href={instagramLink(settings.instagram)} target="_blank" rel="noopener noreferrer">
+                <BrandIcon name="instagram" size={24} />
+                <span>
+                  <small>Instagram</small>
+                  {instagramHandle(settings.instagram)}
                 </span>
               </a>
             )}
@@ -55,15 +65,6 @@ export default async function ContactPage(props: PageProps<'/contact'>) {
                 <span>
                   <small>Email</small>
                   {settings.contact_email}
-                </span>
-              </a>
-            )}
-            {settings.instagram && (
-              <a className="contact-method" href={instagramLink(settings.instagram)} target="_blank" rel="noopener noreferrer">
-                <Icon name="instagram" size={24} />
-                <span>
-                  <small>Instagram</small>
-                  {settings.instagram}
                 </span>
               </a>
             )}

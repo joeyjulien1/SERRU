@@ -60,6 +60,25 @@
 .cart-btn {
   position: relative;
 }
+/* Instagram / WhatsApp next to the cart, in the logo's teal */
+.header-social {
+  color: var(--teal-700);
+  transition:
+    color 0.2s,
+    background-color 0.2s;
+}
+.header-social:hover {
+  color: var(--teal-500);
+}
+@media (max-width: 1023px) {
+  .site-header__right {
+    gap: 0;
+  }
+  .header-social {
+    width: 32px;
+    height: 32px;
+  }
+}
 .cart-btn__count {
   position: absolute;
   top: 4px;

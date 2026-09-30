@@ -1,17 +1,9 @@
 import Link from 'next/link';
 import type { Settings } from '@/lib/settings';
+import { instagramLink, whatsappLink } from '@/lib/social';
+import { BrandIcon } from '../BrandIcon';
 import { Icon } from '../Icon';
 import { PaymentMethods } from './PaymentMethods';
-
-export function whatsappLink(number: string): string {
-  return `https://wa.me/${number.replace(/[^\d]/g, '')}`;
-}
-
-export function instagramLink(handle: string): string {
-  const h = handle.trim();
-  if (/^https?:\/\//.test(h)) return h;
-  return `https://instagram.com/${h.replace(/^@/, '')}`;
-}
 
 export function Footer({ settings, categories }: { settings: Settings; categories: { slug: string; name: string }[] }) {
   const year = new Date().getFullYear();
@@ -28,12 +20,12 @@ export function Footer({ settings, categories }: { settings: Settings; categorie
               <div className="social">
                 {settings.instagram && (
                   <a href={instagramLink(settings.instagram)} target="_blank" rel="noopener noreferrer" aria-label="Instagram">
-                    <Icon name="instagram" size={18} />
+                    <BrandIcon name="instagram" size={17} />
                   </a>
                 )}
                 {settings.whatsapp && (
                   <a href={whatsappLink(settings.whatsapp)} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp">
-                    <Icon name="whatsapp" size={18} />
+                    <BrandIcon name="whatsapp" size={17} />
                   </a>
                 )}
                 {settings.contact_email && (

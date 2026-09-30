@@ -135,6 +135,8 @@ for (const [before, after] of REWORDED) {
   await db.execute({ sql: 'UPDATE pages SET body = REPLACE(body, ?, ?) WHERE instr(body, ?) > 0', args: [before, after, before] });
 }
 await db.execute("UPDATE settings SET value = REPLACE(value, 'Secure card checkout', 'Pay with Whish or cash') WHERE key = 'marquee'");
+// The store's Instagram, unless one was already entered in Admin → Settings.
+await db.execute("UPDATE settings SET value = 'https://www.instagram.com/serrustudio/' WHERE key = 'instagram' AND value = ''");
 log('pages ready');
 
 // The announcement bar now promotes "See it on your wall". Only the untouched old default is replaced;
