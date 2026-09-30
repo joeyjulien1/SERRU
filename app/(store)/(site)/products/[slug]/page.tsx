@@ -80,19 +80,19 @@ export default async function ProductPage(props: PageProps<'/products/[slug]'>) 
         </nav>
 
         <div className="pdp">
-          <Gallery images={product.images} title={product.title} fallbackSlug={product.category?.slug ?? 'default'} />
+          <div className="pdp__media">
+            <Gallery images={product.images} title={product.title} fallbackSlug={product.category?.slug ?? 'default'} />
+          </div>
 
           <div className="pdp__info">
-            <div className="stack" style={{ '--stack': '12px' } as React.CSSProperties}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {product.category && <span className="eyebrow">{product.category.name}</span>}
-              </div>
+            <header className="pdp__head">
+              {product.category && <span className="eyebrow">{product.category.name}</span>}
               <h1 className="pdp__title">{product.title}</h1>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              <div className="pdp__badges">
                 <ProductBadges product={product} />
                 {product.madeToOrder && !product.soldOut && <span className="badge badge--mto">Made to order</span>}
               </div>
-            </div>
+            </header>
 
             <BuyBox
               product={{
@@ -107,15 +107,15 @@ export default async function ProductPage(props: PageProps<'/products/[slug]'>) 
               }}
             />
 
-            <ul className="trust">
+            <ul className="pdp__perks">
               <li>
-                <Icon name="cash" size={22} /> Whish or cash on delivery
+                <Icon name="cash" size={20} /> Pay with Whish Money or cash on delivery
               </li>
               <li>
-                <Icon name="box" size={22} /> Crated &amp; insured
+                <Icon name="box" size={20} /> Crated, insured and ready to hang
               </li>
               <li>
-                <Icon name="sparkle" size={22} /> Crafted in our lab
+                <Icon name="sparkle" size={20} /> Crafted by hand in our lab
               </li>
             </ul>
 

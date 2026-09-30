@@ -76,7 +76,7 @@ export function BuyBox({
   }
 
   return (
-    <>
+    <div className="pdp__buy">
       <div className="pdp__price">
         <Price cents={variant.priceCents} compareAtCents={variant.compareAtCents} currency={currency} />
         {saving > 0 && <span className="pdp__save">Save {formatMoney(saving, currency)}</span>}
@@ -85,8 +85,7 @@ export function BuyBox({
       {product.variants.length > 1 || product.variants[0].label ? (
         <div>
           <div className="option-label" id="size-label">
-            <span>Size</span>
-            <span>{variant.label}</span>
+            Size
           </div>
           <div className="size-options" role="radiogroup" aria-labelledby="size-label">
             {product.variants.map((v) => {
@@ -151,6 +150,6 @@ export function BuyBox({
           Add to cart
         </button>
       </div>
-    </>
+    </div>
   );
 }

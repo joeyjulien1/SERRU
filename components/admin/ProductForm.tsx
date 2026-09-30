@@ -160,14 +160,22 @@ export function ProductForm({
           <section className="adm-card">
             <div className="adm-card__head">
               <h2 className="adm-card__title">Preview photos</h2>
-              <span className="adm-help">{previews.length} / 20</span>
+              <span className="adm-help">{previews.length} / 2</span>
             </div>
             <div className="adm-card__body">
               <p className="adm-help" style={{ marginBottom: 12 }}>
-                The piece in a real space — a living room, salon or office. The first one also appears when shoppers hover
-                over the product. Use the arrows to reorder.
+                Up to two photos of the piece in a real space — a living room, salon or office. In the shop they play after
+                the main photo as a slideshow; the first also appears when shoppers hover over the product. Use the arrows to
+                reorder.
               </p>
-              <MediaUploader value={previews} onChange={setPreviews} label="Upload preview photos" coverLabel={null} />
+              <MediaUploader
+                value={previews}
+                onChange={setPreviews}
+                max={2}
+                label="Upload preview photos"
+                hint="Up to 2 · JPG, PNG or WebP · max 20 MB"
+                coverLabel={null}
+              />
             </div>
           </section>
 

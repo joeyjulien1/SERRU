@@ -1,40 +1,43 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import type { Media } from '@/lib/media';
 import { CategoryArt } from '../CategoryArt';
 import { Icon } from '../Icon';
 
-export function Gallery({ images, title, fallbackSlug }: { images: Media[]; title: string; fallbackSlug: string }) {
-  const track = useRef<HTMLDivElement>(null);
-  const [index, setIndex] = useState(0);
+const AUTOPLAY_MS = 4000;
 
-  const goTo = useCallback((i: number) => {
-    const el = track.current;
-    if (!el) return;
-    el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
-  }, []);
+/** Product photos: the main photo first, then the previews — a crossfading slideshow with arrows, dots and swipe. */
+export function Gallery({ images, title, fallbackSlug }: { images: Media[]; title: string; fallbackSlug: string }) {
+  const [index, setIndex] = useState(0);
+  const [hovering, setHovering] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const swipeStart = useRef<number | null>(null);
+  const count = images.length;
+  const playing = count > 1 && !hovering && !reducedMotion;
 
   useEffect(() => {
-    const el = track.current;
-    if (!el) return;
-    let frame = 0;
-    const onScroll = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => setIndex(Math.round(el.scrollLeft / Math.max(1, el.clientWidth))));
-    };
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => {
-      el.removeEventListener('scroll', onScroll);
-      cancelAnimationFrame(frame);
-    };
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => setReducedMotion(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
   }, []);
 
-  if (images.length === 0) {
+  // Next photo every 4 seconds (skipped while the tab is in the background); any change restarts the timer.
+  useEffect(() => {
+    if (!playing) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') setIndex((i) => (i + 1) % count);
+    }, AUTOPLAY_MS);
+    return () => clearInterval(timer);
+  }, [playing, index, count]);
+
+  if (count === 0) {
     return (
       <div className="gallery">
-        <div className="gallery__track">
-          <div className="gallery__slide">
+        <div className="gallery__stage">
+          <div className="gallery__slide" data-active="">
             <CategoryArt slug={fallbackSlug} />
           </div>
         </div>
@@ -42,57 +45,92 @@ export function Gallery({ images, title, fallbackSlug }: { images: Media[]; titl
     );
   }
 
+  const step = (delta: number) => setIndex((i) => (i + delta + count) % count);
+
+  function onPointerDown(e: PointerEvent) {
+    if (e.pointerType !== 'mouse') setHovering(true); // hold still while a finger is on the photo
+    swipeStart.current = e.clientX;
+  }
+  function onPointerUp(e: PointerEvent) {
+    if (e.pointerType !== 'mouse') setHovering(false);
+    if (swipeStart.current === null) return;
+    const dx = e.clientX - swipeStart.current;
+    swipeStart.current = null;
+    if (Math.abs(dx) > 40) step(dx < 0 ? 1 : -1);
+  }
+  function onKeyDown(e: KeyboardEvent) {
+    if (e.key === 'ArrowRight') step(1);
+    else if (e.key === 'ArrowLeft') step(-1);
+    else return;
+    e.preventDefault();
+  }
+
   return (
-    <div className="gallery" aria-roledescription="carousel" aria-label={`${title} images`}>
-      <div className="gallery__stage">
-        <div className="gallery__track" ref={track} tabIndex={0}>
-          {images.map((img, i) => (
-            <figure className="gallery__slide" key={img.id} aria-label={`Image ${i + 1} of ${images.length}`}>
-              <img
-                src={img.url}
-                alt={img.alt || `${title} — image ${i + 1}`}
-                data-cutout={img.cutout ? '' : undefined}
-                width={img.width}
-                height={img.height}
-                loading={i === 0 ? 'eager' : 'lazy'}
-                fetchPriority={i === 0 ? 'high' : undefined}
-              />
-            </figure>
-          ))}
-        </div>
-        {images.length > 1 && (
+    <div
+      className="gallery"
+      role="region"
+      aria-roledescription="carousel"
+      aria-label={`${title} photos`}
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => setHovering(false)}
+    >
+      <div
+        className="gallery__stage"
+        tabIndex={count > 1 ? 0 : undefined}
+        onKeyDown={count > 1 ? onKeyDown : undefined}
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
+        onPointerCancel={() => {
+          swipeStart.current = null;
+          setHovering(false);
+        }}
+        aria-live={playing ? 'off' : 'polite'}
+      >
+        {images.map((img, i) => (
+          <figure
+            className="gallery__slide"
+            key={img.id}
+            data-active={i === index ? '' : undefined}
+            aria-hidden={i !== index}
+            aria-roledescription="slide"
+            aria-label={`${i + 1} of ${count}`}
+          >
+            <img
+              src={img.url}
+              alt={img.alt || `${title} — photo ${i + 1}`}
+              data-cutout={img.cutout ? '' : undefined}
+              width={img.width}
+              height={img.height}
+              draggable={false}
+              fetchPriority={i === 0 ? 'high' : undefined}
+            />
+          </figure>
+        ))}
+
+        {count > 1 && (
           <>
-            <div className="gallery__arrows">
-              <button type="button" className="icon-btn" onClick={() => goTo(index - 1)} disabled={index === 0} aria-label="Previous image">
-                <Icon name="chevronLeft" />
-              </button>
-              <button
-                type="button"
-                className="icon-btn"
-                onClick={() => goTo(index + 1)}
-                disabled={index >= images.length - 1}
-                aria-label="Next image"
-              >
-                <Icon name="chevronRight" />
-              </button>
-            </div>
-            <span className="gallery__counter" aria-hidden="true">
-              {index + 1} / {images.length} · swipe
-            </span>
+            <button type="button" className="gallery__arrow gallery__arrow--prev" onClick={() => step(-1)} aria-label="Previous photo">
+              <Icon name="chevronLeft" size={20} />
+            </button>
+            <button type="button" className="gallery__arrow gallery__arrow--next" onClick={() => step(1)} aria-label="Next photo">
+              <Icon name="chevronRight" size={20} />
+            </button>
           </>
         )}
       </div>
-      {images.length > 1 && (
-        <div className="gallery__thumbs">
+
+      {count > 1 && (
+        <div className="gallery__dots" data-playing={playing ? '' : undefined}>
           {images.map((img, i) => (
             <button
               type="button"
               key={img.id}
-              onClick={() => goTo(i)}
+              onClick={() => setIndex(i)}
               aria-current={i === index}
-              aria-label={`Show image ${i + 1}`}
+              aria-label={`Show photo ${i + 1}`}
             >
-              <img src={img.thumbUrl} alt="" loading="lazy" />
+              {/* Restarted on every change so the fill tracks the 4-second timer. */}
+              {i === index && <span key={index} style={{ animationDuration: `${AUTOPLAY_MS}ms` }} />}
             </button>
           ))}
         </div>
