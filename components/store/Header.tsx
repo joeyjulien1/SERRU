@@ -139,43 +139,56 @@ export function Header({
         </div>
       </header>
 
-      {/* Mobile menu */}
-      <div className="drawer drawer--left" data-open={menuOpen} aria-hidden={!menuOpen} inert={!menuOpen}>
-        <div className="drawer__scrim" onClick={closeMenu} />
+      {/* Mobile menu: full screen */}
+      <div className="drawer drawer--menu" data-open={menuOpen} aria-hidden={!menuOpen} inert={!menuOpen}>
         <aside className="drawer__panel" role="dialog" aria-modal="true" aria-label="Menu">
           <div className="drawer__head">
-            <img src="/brand/logo.svg" alt="SERRU LAB" style={{ height: 26, width: 'auto' }} />
+            <Link href="/" onClick={closeMenu} aria-label="SERRU LAB — home">
+              <img src="/brand/logo.svg" alt="SERRU LAB" width={126} height={30} />
+            </Link>
             <button type="button" className="icon-btn" onClick={closeMenu} aria-label="Close menu">
-              <Icon name="close" />
+              <Icon name="close" size={24} />
             </button>
           </div>
           <div className="drawer__body">
             <nav className="mobile-nav" aria-label="Mobile">
-              <Link href="/shop">
-                Shop all <Icon name="arrowRight" size={16} />
-              </Link>
-              <Link href="/shop?filter=hot">
-                Hot now <Icon name="arrowRight" size={16} />
-              </Link>
-              <Link href="/shop?filter=one-of-one">
-                One of one <Icon name="arrowRight" size={16} />
-              </Link>
-              <Link href="/pages/about">
-                About <Icon name="arrowRight" size={16} />
-              </Link>
-              <Link href="/contact">
-                Contact <Icon name="arrowRight" size={16} />
-              </Link>
+              {[
+                ['/shop', 'Shop all'],
+                ['/shop?filter=hot', 'Hot now'],
+                ['/shop?filter=one-of-one', 'One of one'],
+                ['/pages/about', 'About'],
+                ['/contact', 'Contact'],
+              ].map(([href, label], i) => (
+                <Link key={href} href={href} onClick={closeMenu} style={{ '--i': i } as React.CSSProperties}>
+                  {label} <Icon name="arrowRight" size={18} />
+                </Link>
+              ))}
             </nav>
             <div className="mobile-nav mobile-nav__group">
-              <span className="eyebrow">Collections</span>
-              {categories.map((c) => (
-                <Link key={c.slug} href={`/collections/${c.slug}`}>
+              <span className="eyebrow" style={{ '--i': 5 } as React.CSSProperties}>
+                Collections
+              </span>
+              {categories.map((c, i) => (
+                <Link key={c.slug} href={`/collections/${c.slug}`} onClick={closeMenu} style={{ '--i': 6 + i } as React.CSSProperties}>
                   {c.name} <span>{c.count > 0 ? c.count : ''}</span>
                 </Link>
               ))}
             </div>
           </div>
+          {(instagramUrl || whatsappUrl) && (
+            <div className="drawer__foot mobile-nav__social">
+              {instagramUrl && (
+                <a href={instagramUrl} target="_blank" rel="noopener noreferrer">
+                  <BrandIcon name="instagram" size={18} /> Instagram
+                </a>
+              )}
+              {whatsappUrl && (
+                <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+                  <BrandIcon name="whatsapp" size={18} /> WhatsApp
+                </a>
+              )}
+            </div>
+          )}
         </aside>
       </div>
 
