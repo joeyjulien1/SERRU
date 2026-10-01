@@ -1,6 +1,7 @@
 import { CartDrawer } from '@/components/cart/CartDrawer';
 import { Footer } from '@/components/store/Footer';
 import { Header } from '@/components/store/Header';
+import { Motion } from '@/components/store/Motion';
 import { listCategories } from '@/lib/catalog';
 import { getSettings } from '@/lib/settings';
 import { instagramLink, whatsappLink } from '@/lib/social';
@@ -30,6 +31,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       <main id="main">{children}</main>
       <Footer settings={settings} categories={categories} />
       <CartDrawer />
+      <Motion />
     </>
   );
 }
