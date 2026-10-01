@@ -133,7 +133,12 @@ export function Header({
             )}
             <button type="button" className="icon-btn cart-btn" onClick={openCart} aria-label={`Open cart, ${count} items`}>
               <Icon name="bag" />
-              {count > 0 && <span className="cart-btn__count">{count}</span>}
+              {count > 0 && (
+                // Keyed on the count so the badge re-mounts, and pops, each time it changes.
+                <span key={count} className="cart-btn__count">
+                  {count}
+                </span>
+              )}
             </button>
           </div>
         </div>

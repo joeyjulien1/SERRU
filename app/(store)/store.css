@@ -1984,3 +1984,117 @@ ul.pdp__perks {
 .wall__note {
   line-height: 1.6;
 }
+
+/* ───────────── Motion on phones: a little magic ─────────────
+   Opacity/transform only (smooth on phones), scroll-driven where the browser supports it,
+   and nothing at all for visitors who ask for reduced motion. */
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+@keyframes rail-card {
+  0% {
+    opacity: 0.45;
+    transform: scale(0.9);
+  }
+  25%,
+  80% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0.45;
+    transform: scale(0.92);
+  }
+}
+@keyframes header-lift {
+  to {
+    border-bottom-color: transparent;
+    box-shadow: 0 10px 30px rgb(12 38 36 / 0.1);
+  }
+}
+@keyframes badge-pop {
+  0% {
+    transform: scale(0.4);
+  }
+  60% {
+    transform: scale(1.25);
+  }
+}
+
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  /* Home: the hero text and buttons rise in one after another, after the photo */
+  .hero__content > * {
+    animation: rise-in 0.8s var(--ease) both;
+  }
+  .hero__content > :nth-child(1) {
+    animation-delay: 0.2s;
+  }
+  .hero__content > :nth-child(2) {
+    animation-delay: 0.3s;
+  }
+  .hero__content > :nth-child(3) {
+    animation-delay: 0.42s;
+  }
+  .hero__content > :nth-child(4) {
+    animation-delay: 0.54s;
+  }
+
+  /* The cart count pops when a piece is added */
+  .cart-btn__count {
+    animation: badge-pop 0.45s var(--ease);
+  }
+
+  /* Gentle press feedback on touch */
+  .btn:active:not(:disabled, [aria-disabled='true']) {
+    transform: scale(0.97);
+  }
+  .product-card__media,
+  .cat-tile {
+    transition: transform 0.2s var(--ease);
+  }
+  .product-card__media:active,
+  .cat-tile:active {
+    transform: scale(0.98);
+  }
+
+  @supports (animation-timeline: view()) {
+    /* Sections and cards rise softly into view while scrolling */
+    .section-head,
+    .product-grid:not(.rail) > *,
+    .cat-grid,
+    .commission,
+    .stat,
+    .newsletter,
+    .wall__grid,
+    .pdp__perks,
+    .accordion,
+    .contact-method,
+    .site-footer__grid > *,
+    .site-footer__payments {
+      animation: rise-in linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 80%;
+    }
+
+    /* Header picks up a soft shadow once the page scrolls */
+    .site-header {
+      animation: header-lift linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0px 120px;
+    }
+  }
+}
+
+@media (max-width: 767px) and (prefers-reduced-motion: no-preference) {
+  /* Product rows: cards grow into place as they slide in, and ease back as they leave */
+  @supports (animation-timeline: view(inline)) {
+    .rail > * {
+      animation: rail-card linear both;
+      animation-timeline: view(inline);
+    }
+  }
+}
