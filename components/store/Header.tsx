@@ -25,6 +25,8 @@ export function Header({
   const pathname = usePathname();
   const { count, open: openCart } = useCart();
   const [menuOpen, setMenuOpen] = useState(false);
+  // The menu opens as a circle growing out of the menu button.
+  const [menuOrigin, setMenuOrigin] = useState('32px 34px');
   const [searchOpen, setSearchOpen] = useState(false);
   const searchInput = useRef<HTMLInputElement>(null);
 
@@ -52,7 +54,16 @@ export function Header({
       <header className="site-header">
         <div className="container site-header__inner">
           <div className="site-header__left">
-            <button type="button" className="icon-btn menu-toggle" onClick={() => setMenuOpen(true)} aria-label="Open menu">
+            <button
+              type="button"
+              className="icon-btn menu-toggle"
+              onClick={(e) => {
+                const r = e.currentTarget.getBoundingClientRect();
+                setMenuOrigin(`${Math.round(r.left + r.width / 2)}px ${Math.round(r.top + r.height / 2)}px`);
+                setMenuOpen(true);
+              }}
+              aria-label="Open menu"
+            >
               <Icon name="menu" size={22} />
             </button>
             <button
@@ -144,15 +155,21 @@ export function Header({
         </div>
       </header>
 
-      {/* Mobile menu: full screen */}
-      <div className="drawer drawer--menu" data-open={menuOpen} aria-hidden={!menuOpen} inert={!menuOpen}>
+      {/* Mobile menu: full screen, in the brand teal */}
+      <div
+        className="drawer drawer--menu"
+        data-open={menuOpen}
+        aria-hidden={!menuOpen}
+        inert={!menuOpen}
+        style={{ '--menu-origin': menuOrigin } as React.CSSProperties}
+      >
         <aside className="drawer__panel" role="dialog" aria-modal="true" aria-label="Menu">
           <div className="drawer__head">
             <Link href="/" onClick={closeMenu} aria-label="SERRU LAB — home">
-              <img src="/brand/logo.svg" alt="SERRU LAB" width={126} height={30} />
+              <img src="/brand/logo-white.svg" alt="SERRU LAB" width={126} height={30} />
             </Link>
-            <button type="button" className="icon-btn" onClick={closeMenu} aria-label="Close menu">
-              <Icon name="close" size={24} />
+            <button type="button" className="icon-btn menu-close" onClick={closeMenu} aria-label="Close menu">
+              <Icon name="close" size={22} />
             </button>
           </div>
           <div className="drawer__body">
@@ -165,35 +182,50 @@ export function Header({
                 ['/contact', 'Contact'],
               ].map(([href, label], i) => (
                 <Link key={href} href={href} onClick={closeMenu} style={{ '--i': i } as React.CSSProperties}>
-                  {label} <Icon name="arrowRight" size={18} />
+                  <span className="mobile-nav__label">
+                    <small>{String(i + 1).padStart(2, '0')}</small>
+                    {label}
+                  </span>
+                  <Icon name="arrowRight" size={18} />
                 </Link>
               ))}
+              {categories.length > 0 && (
+                <div className="menu-collections" style={{ '--i': 5 } as React.CSSProperties}>
+                  <span className="eyebrow">Collections</span>
+                  <div className="menu-collections__row">
+                    {categories.map((c) => (
+                      <Link key={c.slug} href={`/collections/${c.slug}`} onClick={closeMenu} className="menu-tile">
+                        <span className="menu-tile__thumb">
+                          {c.image ? <img src={c.image} alt="" loading="lazy" /> : <CategoryArt slug={c.slug} />}
+                        </span>
+                        <span className="menu-tile__name">{c.name}</span>
+                        <span className="menu-tile__count">
+                          {c.count > 0 ? `${c.count} ${c.count === 1 ? 'piece' : 'pieces'}` : 'Commission'}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
             </nav>
-            <div className="mobile-nav mobile-nav__group">
-              <span className="eyebrow" style={{ '--i': 5 } as React.CSSProperties}>
-                Collections
-              </span>
-              {categories.map((c, i) => (
-                <Link key={c.slug} href={`/collections/${c.slug}`} onClick={closeMenu} style={{ '--i': 6 + i } as React.CSSProperties}>
-                  {c.name} <span>{c.count > 0 ? c.count : ''}</span>
-                </Link>
-              ))}
-            </div>
           </div>
-          {(instagramUrl || whatsappUrl) && (
-            <div className="drawer__foot mobile-nav__social">
-              {instagramUrl && (
-                <a href={instagramUrl} target="_blank" rel="noopener noreferrer">
-                  <BrandIcon name="instagram" size={18} /> Instagram
-                </a>
-              )}
-              {whatsappUrl && (
-                <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
-                  <BrandIcon name="whatsapp" size={18} /> WhatsApp
-                </a>
-              )}
-            </div>
-          )}
+          <div className="drawer__foot">
+            <span className="menu-tagline">Luxury Perfected.</span>
+            {(instagramUrl || whatsappUrl) && (
+              <div className="mobile-nav__social">
+                {instagramUrl && (
+                  <a href={instagramUrl} target="_blank" rel="noopener noreferrer">
+                    <BrandIcon name="instagram" size={18} /> Instagram
+                  </a>
+                )}
+                {whatsappUrl && (
+                  <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+                    <BrandIcon name="whatsapp" size={18} /> WhatsApp
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
         </aside>
       </div>
 

@@ -15,8 +15,11 @@ const RAIL_QUERY = '(max-width: 767px)';
 
 // [selector, effect]: the first effect that matches an element wins.
 const REVEALS: [string, string][] = [
-  ['.section-head .eyebrow, .ooo__intro .eyebrow, .commission .eyebrow, .newsletter .eyebrow', 'eyebrow'],
-  ['.section-head h2, .ooo__intro h2, .commission h2, .newsletter h2, .prose h2', 'title'],
+  [
+    '.section-head .eyebrow, .ooo__intro .eyebrow, .commission .eyebrow, .newsletter .eyebrow, .contact-steps .eyebrow, .contact__form-head .eyebrow',
+    'eyebrow',
+  ],
+  ['.section-head h2, .ooo__intro h2, .commission h2, .newsletter h2, .prose h2, .contact__form-head h2', 'title'],
   ['.rail', 'rail'],
   ['.product-grid:not(.rail) > .product-card', 'card'],
   ['.cat-tile', 'tile'],
@@ -37,6 +40,7 @@ const REVEALS: [string, string][] = [
       '.accordion details',
       '.prose > :not(h2)',
       '.contact-method',
+      '.contact-steps__list li',
       '.panel',
       '.site-footer__grid > *',
       '.site-footer__payments',
