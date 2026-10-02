@@ -15,15 +15,15 @@ export function StoreSettingsForm({
   values,
   currencies,
   countries,
-  heroImage,
+  heroImages,
 }: {
   values: Record<string, string>;
   currencies: readonly string[];
   countries: { code: string; name: string }[];
-  heroImage: Media | null;
+  heroImages: Media[];
 }) {
   const [state, action, pending] = useFormAction(saveSettingsAction);
-  const [hero, setHero] = useState<Media[]>(heroImage ? [heroImage] : []);
+  const [hero, setHero] = useState<Media[]>(heroImages);
   const e = state.errors ?? {};
   const val = (k: string) => state.values?.[k] ?? values[k] ?? '';
 
@@ -62,6 +62,7 @@ export function StoreSettingsForm({
   return (
     <form onSubmit={action}>
       <input type="hidden" name="hero_media_id" value={hero[0]?.id ?? ''} />
+      <input type="hidden" name="hero_media_id_2" value={hero[1]?.id ?? ''} />
       <div className="adm-grid adm-grid--2">
         <section className="adm-card">
           <div className="adm-card__head">
@@ -133,8 +134,15 @@ export function StoreSettingsForm({
             {render({ name: 'hero_title', label: 'Hero — title' })}
             {render({ name: 'hero_subtitle', label: 'Hero — text', type: 'textarea', rows: 3 })}
             <div className="field">
-              <span className="label">Hero image</span>
-              <MediaUploader value={hero} onChange={setHero} multiple={false} label="Upload hero image" />
+              <span className="label">Hero photos</span>
+              <MediaUploader
+                value={hero}
+                onChange={setHero}
+                max={2}
+                coverLabel={null}
+                label="Upload hero photos"
+                hint="Up to 2 · with two, they take turns every 5 seconds · max 20 MB"
+              />
               {e.hero_media_id && <span className="field-error">{e.hero_media_id}</span>}
             </div>
             {render({ name: 'marquee', label: 'Scrolling banner lines', type: 'textarea', rows: 4, hint: 'One phrase per line.' })}

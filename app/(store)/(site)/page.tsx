@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { CategoryArt } from '@/components/CategoryArt';
 import { Icon } from '@/components/Icon';
+import { HeroSlideshow } from '@/components/store/HeroSlideshow';
 import { Newsletter } from '@/components/store/Newsletter';
 import { ProductCard } from '@/components/store/ProductCard';
 import { listCategories, listProducts } from '@/lib/catalog';
@@ -16,12 +17,14 @@ const PROMISES = [
 export default async function HomePage() {
   const settings = await getSettings();
   const currency = settings.currency;
-  const [hot, oneOfOne, newest, categories, heroMedia] = await Promise.all([
+  const [hot, oneOfOne, newest, categories, heroImages] = await Promise.all([
     listProducts({ hot: true, sort: 'featured', limit: 8 }).then((r) => r.items),
     listProducts({ oneOfOne: true, sort: 'newest', limit: 6 }).then((r) => r.items),
     listProducts({ sort: 'newest', limit: 4 }).then((r) => r.items),
     listCategories(),
-    settings.hero_media_id ? getMedia(Number(settings.hero_media_id)) : null,
+    Promise.all([settings.hero_media_id, settings.hero_media_id_2].filter(Boolean).map((id) => getMedia(Number(id)))).then(
+      (list) => list.filter((m) => m !== null),
+    ),
   ]);
   const featured = hot.length ? hot : (await listProducts({ sort: 'featured', limit: 8 })).items;
   const marquee = settings.marquee
@@ -35,8 +38,8 @@ export default async function HomePage() {
       <section className="hero" aria-labelledby="hero-title">
         <div className="hero__grid">
           <div className="hero__media">
-            {heroMedia ? (
-              <img src={heroMedia.url} alt={heroMedia.alt} width={heroMedia.width} height={heroMedia.height} fetchPriority="high" />
+            {heroImages.length > 0 ? (
+              <HeroSlideshow images={heroImages.map((m) => ({ url: m.url, alt: m.alt, width: m.width, height: m.height }))} />
             ) : (
               <CategoryArt slug="parametric" />
             )}

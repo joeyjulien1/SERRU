@@ -611,6 +611,17 @@
   inset: 0;
   background: linear-gradient(180deg, rgb(12 38 36 / 0) 55%, rgb(12 38 36 / 0.9) 100%);
 }
+/* A second hero photo sits over the first and fades in and out (HeroSlideshow) */
+.hero__media img + img {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  animation: none;
+  transition: opacity 1.6s var(--ease);
+}
+.hero__media img + img[data-active] {
+  opacity: 1;
+}
 @keyframes hero-in {
   from {
     transform: scale(1.06);

@@ -23,7 +23,9 @@ export default async function SettingsPage() {
   const mode = paymentMode();
   const tapKey = process.env.TAP_SECRET_KEY ?? '';
   const admins = isOwner ? await listAdmins() : [];
-  const heroImage = settings.hero_media_id ? await getMedia(Number(settings.hero_media_id)) : null;
+  const heroImages = (
+    await Promise.all([settings.hero_media_id, settings.hero_media_id_2].filter(Boolean).map((id) => getMedia(Number(id))))
+  ).filter((m) => m !== null);
   const values: Record<string, string> = {
     ...settings,
     shipping_flat: centsToInput(Number(settings.shipping_flat_cents)),
@@ -35,7 +37,7 @@ export default async function SettingsPage() {
       <PageHead title="Settings" description="Store details, delivery, homepage content, payments and team." />
 
       {isOwner ? (
-        <StoreSettingsForm values={values} currencies={CURRENCIES} countries={COUNTRIES} heroImage={heroImage} />
+        <StoreSettingsForm values={values} currencies={CURRENCIES} countries={COUNTRIES} heroImages={heroImages} />
       ) : (
         <Alert tone="info">Store settings can only be changed by the owner. You can change your own password below.</Alert>
       )}

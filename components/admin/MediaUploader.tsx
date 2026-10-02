@@ -69,7 +69,7 @@ export function MediaUploader({
     const room = multiple ? Math.max(0, limit - value.length) : 1;
     const queue = files.filter((f) => f.type.startsWith('image/') || /\.(jpe?g|png|webp|avif|gif|heic)$/i.test(f.name)).slice(0, room);
     const problems: string[] = [];
-    if (files.length > queue.length) problems.push(multiple ? `Only images are accepted (up to ${limit} per product).` : 'Only image files are accepted.');
+    if (files.length > queue.length) problems.push(multiple ? `Only images are accepted (up to ${limit}).` : 'Only image files are accepted.');
     for (const file of queue) {
       if (file.size > MAX_BYTES) {
         problems.push(`${file.name} is larger than 20 MB.`);

@@ -17,6 +17,8 @@ export const SETTING_DEFAULTS = {
   hero_subtitle:
     'Statement pieces designed and crafted in our lab — parametric wood, plexi, metal and mirror art, made to the size of your space.',
   hero_media_id: '',
+  /** Optional second hero photo: the two take turns every 5 seconds. */
+  hero_media_id_2: '',
   marquee: 'Crafted in our lab\nCustom sizes available\nPay with Whish or cash\nLuxury perfected',
   contact_email: '',
   contact_phone: '',

@@ -415,10 +415,11 @@ export async function saveSettingsAction(_: FormState, data: FormData): Promise<
     if (cents === null) errors[field] = 'Enter an amount like 25 or 25.50';
     else next[key] = String(cents);
   }
-  if (data.has('hero_media_id')) {
-    const raw = str(data.get('hero_media_id'));
+  for (const key of ['hero_media_id', 'hero_media_id_2'] as const) {
+    if (!data.has(key)) continue;
+    const raw = str(data.get(key));
     if (raw && !(await get('SELECT id FROM media WHERE id = ?', Number(raw)))) errors.hero_media_id = 'Image not found';
-    else next.hero_media_id = raw;
+    else next[key] = raw;
   }
 
   if (Object.keys(errors).length) return { ok: false, errors, message: 'Please fix the highlighted fields.', values };
