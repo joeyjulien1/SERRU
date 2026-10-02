@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { CategoryArt } from '@/components/CategoryArt';
 import { Icon } from '@/components/Icon';
 import { Newsletter } from '@/components/store/Newsletter';
-import { ProductCard, RailProgress } from '@/components/store/ProductCard';
+import { ProductCard } from '@/components/store/ProductCard';
 import { listCategories, listProducts } from '@/lib/catalog';
 import { getMedia } from '@/lib/media';
 import { getSettings } from '@/lib/settings';
@@ -24,9 +24,6 @@ export default async function HomePage() {
     settings.hero_media_id ? getMedia(Number(settings.hero_media_id)) : null,
   ]);
   const featured = hot.length ? hot : (await listProducts({ sort: 'featured', limit: 8 })).items;
-  // A piece can appear in more than one row; only its first card takes part in the open-product animation.
-  const seen = new Set<number>();
-  const firstCard = (id: number) => !seen.has(id) && !!seen.add(id);
   const marquee = settings.marquee
     .split('\n')
     .map((s) => s.trim())
@@ -100,10 +97,9 @@ export default async function HomePage() {
             </div>
             <div className="product-grid rail">
               {featured.map((p, i) => (
-                <ProductCard key={p.id} product={p} currency={currency} priority={i < 2} morph={firstCard(p.id)} />
+                <ProductCard key={p.id} product={p} currency={currency} priority={i < 2} />
               ))}
             </div>
-            <RailProgress />
           </div>
         </section>
       )}
@@ -163,10 +159,9 @@ export default async function HomePage() {
             </div>
             <div className="product-grid rail">
               {oneOfOne.map((p) => (
-                <ProductCard key={p.id} product={p} currency={currency} morph={firstCard(p.id)} />
+                <ProductCard key={p.id} product={p} currency={currency} />
               ))}
             </div>
-            <RailProgress />
           </div>
         </section>
       )}
@@ -209,10 +204,9 @@ export default async function HomePage() {
             </div>
             <div className="product-grid rail">
               {newest.map((p) => (
-                <ProductCard key={p.id} product={p} currency={currency} morph={firstCard(p.id)} />
+                <ProductCard key={p.id} product={p} currency={currency} />
               ))}
             </div>
-            <RailProgress />
           </div>
         </section>
       )}

@@ -2388,14 +2388,6 @@ a.contact-method--primary:hover {
     transform: scale(1.25);
   }
 }
-@keyframes sheen {
-  from {
-    translate: -110% 0;
-  }
-  to {
-    translate: 110% 0;
-  }
-}
 @keyframes nudge {
   50% {
     translate: 6px 0;
@@ -2452,26 +2444,19 @@ a.contact-method--primary:hover {
     scale: calc(1 + var(--hero, 0) * 0.14);
   }
 
-  /* ── Product page and simple pages: the top settles in on arrival ── */
-  .breadcrumbs,
-  .pdp__head > *,
-  .pdp__buy,
+  /* ── Simple pages (contact, about…): the heading settles in on arrival ── */
   .page-head > * {
     animation: rise-in 1s var(--fx-ease) both;
   }
-  .pdp__head > :nth-child(1),
   .page-head > :nth-child(1) {
     animation-delay: 0.15s;
   }
-  .pdp__head > :nth-child(2),
   .page-head > :nth-child(2) {
     animation-delay: 0.25s;
   }
-  .pdp__head > :nth-child(3),
   .page-head > :nth-child(3) {
     animation-delay: 0.35s;
   }
-  .pdp__buy,
   .page-head > :nth-child(4) {
     animation-delay: 0.45s;
   }
@@ -2488,11 +2473,9 @@ a.contact-method--primary:hover {
   .btn:active:not(:disabled, [aria-disabled='true']) {
     transform: scale(0.97);
   }
-  .product-card__media,
   .cat-tile {
     transition: transform 0.2s var(--ease);
   }
-  .product-card__media:active,
   .cat-tile:active {
     transform: scale(0.98);
   }
@@ -2530,81 +2513,6 @@ a.contact-method--primary:hover {
     opacity: 0;
     translate: 0 0.45em;
     clip-path: inset(-20% -20% 100% -20%);
-  }
-
-  /* ── Product cards (grids and rows), choreographed: the frame rises, the photo unveils and
-     settles from a slow zoom, the badges appear, the text follows line by line, and a soft light
-     sweeps once across the photo. Cards in a row arrive one after another. ── */
-  .rail[data-fx] > :nth-child(2) {
-    --fx-i: 1;
-  }
-  .rail[data-fx] > :nth-child(3) {
-    --fx-i: 2;
-  }
-  .rail[data-fx] > :nth-child(n + 4) {
-    --fx-i: 3;
-  }
-  :is([data-fx='card'], .rail[data-fx] > *) {
-    --fx-t: calc(var(--fx-delay, 0ms) + var(--fx-i, 0) * 140ms);
-  }
-  .rail[data-fx] > * {
-    transition: translate 1.3s var(--fx-ease) var(--fx-t);
-  }
-  [data-fx='card']:not([data-in]),
-  .rail[data-fx]:not([data-in]) > * {
-    opacity: 1;
-    translate: 0 56px;
-  }
-  :is([data-fx='card'], .rail[data-fx] > *) .product-card__media {
-    clip-path: inset(0);
-    transition:
-      clip-path 1.4s var(--fx-ease) var(--fx-t),
-      transform 0.2s var(--ease);
-  }
-  :is([data-fx='card']:not([data-in]), .rail[data-fx]:not([data-in]) > *) .product-card__media {
-    clip-path: inset(100% 0 0 0);
-  }
-  :is([data-fx='card'], .rail[data-fx] > *) .product-card__media img:first-child {
-    transition:
-      opacity 0.5s var(--ease),
-      scale 2.2s var(--fx-ease) var(--fx-t);
-  }
-  :is([data-fx='card']:not([data-in]), .rail[data-fx]:not([data-in]) > *) .product-card__media img:first-child {
-    scale: 1.3;
-  }
-  :is([data-fx='card'], .rail[data-fx] > *) :is(.product-card__badges, .product-card__stock) {
-    transition:
-      opacity 0.6s var(--fx-ease) calc(var(--fx-t) + 650ms),
-      translate 0.8s var(--fx-ease) calc(var(--fx-t) + 650ms);
-  }
-  :is([data-fx='card']:not([data-in]), .rail[data-fx]:not([data-in]) > *) :is(.product-card__badges, .product-card__stock) {
-    opacity: 0;
-    translate: 0 -8px;
-  }
-  :is([data-fx='card'], .rail[data-fx] > *) .product-card__body > * {
-    transition:
-      opacity 0.8s var(--fx-ease) calc(var(--fx-t) + 450ms + var(--fx-line, 0) * 90ms),
-      translate 1s var(--fx-ease) calc(var(--fx-t) + 450ms + var(--fx-line, 0) * 90ms);
-  }
-  :is([data-fx='card'], .rail[data-fx] > *) .product-card__body > :nth-child(2) {
-    --fx-line: 1;
-  }
-  :is([data-fx='card'], .rail[data-fx] > *) .product-card__body > :nth-child(3) {
-    --fx-line: 2;
-  }
-  :is([data-fx='card']:not([data-in]), .rail[data-fx]:not([data-in]) > *) .product-card__body > * {
-    opacity: 0;
-    translate: 0 16px;
-  }
-  /* The light sweep */
-  :is([data-fx='card'][data-in], .rail[data-fx][data-in] > *) .product-card__media::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.32) 50%, transparent 65%);
-    pointer-events: none;
-    animation: sheen 1.3s cubic-bezier(0.45, 0, 0.2, 1) calc(var(--fx-t) + 900ms) both;
   }
 
   /* Category tiles: wiped open from the outside edge, the photo settling, then the name */
@@ -2670,137 +2578,5 @@ a.contact-method--primary:hover {
   /* "View all" arrows nudge once they arrive */
   .text-btn[data-in] svg {
     animation: nudge 0.6s var(--ease) calc(var(--fx-delay, 0ms) + 0.9s) 2;
-  }
-}
-
-.rail-progress {
-  display: none;
-}
-
-@media (max-width: 767px) and (prefers-reduced-motion: no-preference) {
-  /* Product rows: the card in front stays sharp and full size; its neighbours ease back behind a
-     soft veil, anchored toward it so the spacing stays even. The photo drifts inside its frame
-     as the row moves, like looking through a window. */
-  .rail > * {
-    transform: scale(calc(1 - var(--pa, 0) * 0.07));
-    transform-origin: calc(50% - var(--pc, 0) * 50%) 50%;
-  }
-  .rail .product-card__media::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    background: var(--white);
-    opacity: calc(var(--pa, 0) * 0.35);
-    pointer-events: none;
-  }
-  .rail .product-card__body,
-  .rail .product-card__badges,
-  .rail .product-card__stock {
-    opacity: calc(1 - var(--pa, 0) * 0.45);
-  }
-  .rail .product-card__media img:first-child {
-    transform: translateX(calc(var(--p, 0) * -8%)) scale(1.16);
-    transition:
-      opacity 0.5s var(--ease),
-      scale 2.2s var(--fx-ease);
-  }
-  .rail .product-card__media img[data-cutout]:first-child {
-    transform: translateX(calc(var(--p, 0) * -4%));
-  }
-
-  /* How far along the row you are */
-  .rail-progress {
-    position: relative;
-    display: block;
-    height: 2px;
-    margin-top: 24px;
-    overflow: hidden;
-    border-radius: 2px;
-    background: var(--line);
-  }
-  .ooo > .rail-progress {
-    margin-top: -16px;
-  }
-  .rail-progress[data-static] {
-    display: none;
-  }
-  .rail-progress span {
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: calc(var(--rail-size, 0.35) * 100%);
-    border-radius: inherit;
-    background: var(--teal-700);
-    transform: translateX(calc(var(--rail-pos, 0) * (1 / var(--rail-size, 0.35) - 1) * 100%));
-  }
-}
-
-
-/* ───────────── Opening a product ─────────────
-   The card's photo flies and grows into the product page's photo frame (React <ViewTransition>,
-   name product-<slug>), while the page behind softly recedes and the new page settles in.
-   Going back plays it in reverse. Browsers without view transitions simply change page. */
-
-::view-transition {
-  pointer-events: none;
-}
-::view-transition-group(.product-morph) {
-  animation-duration: 0.8s;
-  animation-timing-function: cubic-bezier(0.65, 0, 0.15, 1);
-}
-::view-transition-image-pair(.product-morph) {
-  animation: morph-soften 0.8s cubic-bezier(0.65, 0, 0.15, 1);
-}
-::view-transition-old(.product-morph),
-::view-transition-new(.product-morph) {
-  height: 100%;
-  object-fit: cover;
-  animation-duration: 0.8s;
-}
-@keyframes morph-soften {
-  45% {
-    filter: blur(1.5px) brightness(1.05);
-  }
-}
-html:active-view-transition-type(product-open)::view-transition-old(root) {
-  animation: page-recede 0.55s cubic-bezier(0.4, 0, 0.2, 1) both;
-}
-html:active-view-transition-type(product-open)::view-transition-new(root) {
-  animation: page-arrive 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.25s both;
-}
-@keyframes page-recede {
-  to {
-    opacity: 0;
-    transform: scale(0.94);
-    filter: blur(6px);
-  }
-}
-@keyframes page-arrive {
-  from {
-    opacity: 0;
-    transform: scale(1.03);
-  }
-}
-/* The header holds its place while the page changes beneath it */
-.site-header {
-  view-transition-name: site-header;
-}
-::view-transition-group(site-header) {
-  z-index: 100;
-  animation-duration: 0.6s;
-  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-}
-::view-transition-old(site-header) {
-  display: none;
-}
-::view-transition-new(site-header) {
-  animation: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation-duration: 0s !important;
-    animation-delay: 0s !important;
   }
 }
