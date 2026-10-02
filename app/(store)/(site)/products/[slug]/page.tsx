@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { Icon } from '@/components/Icon';
 import { BuyBox } from '@/components/store/BuyBox';
 import { Gallery } from '@/components/store/Gallery';
-import { ProductBadges, ProductCard } from '@/components/store/ProductCard';
+import { ProductBadges, ProductCard, productMorphName, RailProgress } from '@/components/store/ProductCard';
 import { WallPreview } from '@/components/store/WallPreview';
 import { getProductBySlug, relatedProducts } from '@/lib/catalog';
 import { formatMoney } from '@/lib/format';
@@ -81,7 +81,12 @@ export default async function ProductPage(props: PageProps<'/products/[slug]'>) 
 
         <div className="pdp">
           <div className="pdp__media">
-            <Gallery images={product.images} title={product.title} fallbackSlug={product.category?.slug ?? 'default'} />
+            <Gallery
+              images={product.images}
+              title={product.title}
+              fallbackSlug={product.category?.slug ?? 'default'}
+              morphName={productMorphName(product.slug)}
+            />
           </div>
 
           <div className="pdp__info">
@@ -178,9 +183,11 @@ export default async function ProductPage(props: PageProps<'/products/[slug]'>) 
             </div>
             <div className="product-grid rail">
               {related.map((p) => (
-                <ProductCard key={p.id} product={p} currency={settings.currency} />
+                // Kept out of the open-product animation: these pieces are often on the page you came from too.
+                <ProductCard key={p.id} product={p} currency={settings.currency} morph={false} />
               ))}
             </div>
+            <RailProgress />
           </div>
         </section>
       )}

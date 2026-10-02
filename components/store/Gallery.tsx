@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useEffect, useRef, useState, ViewTransition, type KeyboardEvent, type PointerEvent } from 'react';
 import type { Media } from '@/lib/media';
 import { CategoryArt } from '../CategoryArt';
 import { Icon } from '../Icon';
@@ -8,7 +8,18 @@ import { Icon } from '../Icon';
 const AUTOPLAY_MS = 4000;
 
 /** Product photos: the main photo first, then the previews — a crossfading slideshow with arrows, dots and swipe. */
-export function Gallery({ images, title, fallbackSlug }: { images: Media[]; title: string; fallbackSlug: string }) {
+export function Gallery({
+  images,
+  title,
+  fallbackSlug,
+  morphName,
+}: {
+  images: Media[];
+  title: string;
+  fallbackSlug: string;
+  /** Shared name of the product card photo that grows into this frame when the page opens. */
+  morphName?: string;
+}) {
   const [index, setIndex] = useState(0);
   const [hovering, setHovering] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -36,11 +47,13 @@ export function Gallery({ images, title, fallbackSlug }: { images: Media[]; titl
   if (count === 0) {
     return (
       <div className="gallery">
-        <div className="gallery__stage">
-          <div className="gallery__slide" data-active="">
-            <CategoryArt slug={fallbackSlug} />
+        <ViewTransition name={morphName} share="product-morph" default="none">
+          <div className="gallery__stage">
+            <div className="gallery__slide" data-active="">
+              <CategoryArt slug={fallbackSlug} />
+            </div>
           </div>
-        </div>
+        </ViewTransition>
       </div>
     );
   }
@@ -74,6 +87,7 @@ export function Gallery({ images, title, fallbackSlug }: { images: Media[]; titl
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
     >
+      <ViewTransition name={morphName} share="product-morph" default="none">
       <div
         className="gallery__stage"
         tabIndex={count > 1 ? 0 : undefined}
@@ -118,6 +132,7 @@ export function Gallery({ images, title, fallbackSlug }: { images: Media[]; titl
           </>
         )}
       </div>
+      </ViewTransition>
 
       {count > 1 && (
         <div className="gallery__dots" data-playing={playing ? '' : undefined}>

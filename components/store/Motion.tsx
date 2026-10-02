@@ -4,8 +4,8 @@ import { useEffect, useRef } from 'react';
 
 /**
  * Motion on phones and tablets. Parts of each page reveal as they scroll into view, product rows
- * turn like a carousel (and lean while they are swiped), the home hero drifts as you scroll away,
- * and a thin bar tracks progress down the page. The page markup is untouched: elements get a
+ * keep the card in front in focus while the others ease back (with a line showing progress along
+ * the row), the home hero drifts as you scroll away, and a thin bar tracks progress down the page. The page markup is untouched: elements get a
  * `data-fx` attribute that store.css animates, and it is removed again once they have arrived.
  * Nothing runs on desktop or for visitors who ask for reduced motion.
  */
@@ -50,9 +50,9 @@ const REVEALS: [string, string][] = [
 ];
 
 /** How long an effect takes, plus room for staggered children, before its styles are dropped. */
-const SETTLE_MS = 2400;
+const SETTLE_MS = 3400;
 
-type RailState = { last: number; skew: number; frame: number };
+type RailState = { frame: number };
 
 export function Motion() {
   const bar = useRef<HTMLDivElement>(null);
@@ -106,9 +106,9 @@ export function Motion() {
       }
       for (const rail of document.querySelectorAll<HTMLElement>('.rail')) {
         if (rails.has(rail)) continue;
-        rails.set(rail, { last: rail.scrollLeft, skew: 0, frame: 0 });
+        rails.set(rail, { frame: 0 });
         rail.addEventListener('scroll', onRailScroll, { passive: true });
-        twist(rail);
+        focusRail(rail);
       }
       for (const [rail, state] of rails) {
         if (rail.isConnected) continue;
@@ -124,16 +124,27 @@ export function Motion() {
       hero = document.querySelector<HTMLElement>('.hero');
     };
 
-    // ── Product rows: carousel turn, plus a lean while swiping ──
-    function twist(rail: HTMLElement) {
+    // ── Product rows: the card in front stays in focus, the rest ease back; a line shows progress ──
+    function focusRail(rail: HTMLElement) {
       const cards = rail.children as HTMLCollectionOf<HTMLElement>;
+      const progress = rail.nextElementSibling?.classList.contains('rail-progress')
+        ? (rail.nextElementSibling as HTMLElement)
+        : null;
+      const max = rail.scrollWidth - rail.clientWidth;
+      if (progress) {
+        progress.toggleAttribute('data-static', max <= 1);
+        progress.style.setProperty('--rail-size', (rail.clientWidth / rail.scrollWidth).toFixed(4));
+        progress.style.setProperty('--rail-pos', max > 1 ? (rail.scrollLeft / max).toFixed(4) : '0');
+      }
       if (cards.length < 2 || !railQuery.matches) return;
       const origin = cards[0].offsetLeft;
       const step = cards[1].offsetLeft - origin;
       if (step <= 0) return;
       for (const card of cards) {
+        // 0 for the card in front, 1 for its neighbour (negative to the left).
         const p = Math.max(-1.5, Math.min(1.5, (card.offsetLeft - origin - rail.scrollLeft) / step));
         card.style.setProperty('--p', p.toFixed(3));
+        card.style.setProperty('--pc', Math.max(-1, Math.min(1, p)).toFixed(3));
         card.style.setProperty('--pa', Math.min(1, Math.abs(p)).toFixed(3));
       }
     }
@@ -141,18 +152,11 @@ export function Motion() {
     function onRailScroll(event: Event) {
       const rail = event.currentTarget as HTMLElement;
       const state = rails.get(rail);
-      if (state && !state.frame) state.frame = requestAnimationFrame(() => railFrame(rail, state));
-    }
-
-    function railFrame(rail: HTMLElement, state: RailState) {
-      const speed = rail.scrollLeft - state.last;
-      state.last = rail.scrollLeft;
-      const lean = Math.max(-5, Math.min(5, -speed * 0.22));
-      state.skew += (lean - state.skew) * 0.2;
-      const settled = speed === 0 && Math.abs(state.skew) < 0.05;
-      rail.style.setProperty('--skew', settled ? '0deg' : `${state.skew.toFixed(2)}deg`);
-      twist(rail);
-      state.frame = settled ? 0 : requestAnimationFrame(() => railFrame(rail, state));
+      if (!state || state.frame) return;
+      state.frame = requestAnimationFrame(() => {
+        state.frame = 0;
+        focusRail(rail);
+      });
     }
 
     // ── Page scroll: progress bar, header shadow, hero drift ──
@@ -173,7 +177,7 @@ export function Motion() {
     }
 
     const onResize = () => {
-      for (const rail of rails.keys()) twist(rail);
+      for (const rail of rails.keys()) focusRail(rail);
       onScroll();
     };
 
