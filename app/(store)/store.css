@@ -270,8 +270,7 @@
   background-color: var(--teal-700);
   background-image:
     radial-gradient(90% 55% at 100% 0%, rgb(47 122 115 / 0.55) 0%, rgb(47 122 115 / 0) 70%),
-    radial-gradient(80% 50% at 0% 100%, rgb(7 26 24 / 0.6) 0%, rgb(7 26 24 / 0) 70%),
-    repeating-linear-gradient(90deg, rgb(255 255 255 / 0.035) 0 1px, transparent 1px 22px);
+    radial-gradient(80% 50% at 0% 100%, rgb(7 26 24 / 0.6) 0%, rgb(7 26 24 / 0) 70%);
   clip-path: circle(0 at var(--menu-origin, 32px 34px));
   transform: none;
   transition: clip-path 0.55s cubic-bezier(0.7, 0, 0.2, 1);
