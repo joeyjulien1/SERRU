@@ -5,7 +5,7 @@ import type { Media } from '@/lib/media';
 import { CategoryArt } from '../CategoryArt';
 import { Icon } from '../Icon';
 
-const AUTOPLAY_MS = 4000;
+const AUTOPLAY_MS = 3000;
 
 /** Product photos: the main photo first, then the previews — a crossfading slideshow with arrows, dots and swipe. */
 export function Gallery({ images, title, fallbackSlug }: { images: Media[]; title: string; fallbackSlug: string }) {
@@ -24,7 +24,7 @@ export function Gallery({ images, title, fallbackSlug }: { images: Media[]; titl
     return () => query.removeEventListener('change', update);
   }, []);
 
-  // Next photo every 4 seconds (skipped while the tab is in the background); any change restarts the timer.
+  // Next photo every 3 seconds (skipped while the tab is in the background); any change restarts the timer.
   useEffect(() => {
     if (!playing) return;
     const timer = setInterval(() => {
