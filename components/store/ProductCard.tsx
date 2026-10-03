@@ -26,12 +26,19 @@ export function ProductCard({
   currency: string;
   priority?: boolean;
 }) {
-  const [first, second] = product.images;
+  const [first, ...more] = product.images;
   const lowStock = !product.soldOut && product.stockLeft !== null && product.stockLeft <= 5;
   const hasRange = product.maxPriceCents > product.priceCents;
   return (
     <article className={`product-card${product.soldOut ? ' product-card--soldout' : ''}`}>
-      <Link href={`/products/${product.slug}`} className="product-card__media" tabIndex={-1} aria-hidden="true">
+      {/* With more than one photo, phones show them in turn every 5 seconds (data-slides, store.css). */}
+      <Link
+        href={`/products/${product.slug}`}
+        className="product-card__media"
+        tabIndex={-1}
+        aria-hidden="true"
+        data-slides={product.images.length > 1 ? product.images.length : undefined}
+      >
         {first ? (
           <img
             src={first.thumbUrl}
@@ -43,7 +50,9 @@ export function ProductCard({
             fetchPriority={priority ? 'high' : undefined}
           />
         ) : null}
-        {second ? <img src={second.thumbUrl} alt="" loading="lazy" /> : null}
+        {more.map((img) => (
+          <img key={img.id} src={img.thumbUrl} alt="" loading="lazy" />
+        ))}
       </Link>
       <div className="product-card__badges">
         <ProductBadges product={product} />

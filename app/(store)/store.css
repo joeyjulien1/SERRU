@@ -851,6 +851,7 @@
 }
 .product-card__media img + img {
   opacity: 0;
+  background: var(--paper);
 }
 /* A product's main photo is the artwork alone (often transparent): show all of it on the paper background. */
 .product-card__media img[data-cutout],
@@ -862,8 +863,64 @@
   .product-card:hover .product-card__media img:first-child {
     transform: scale(1.04);
   }
-  .product-card:hover .product-card__media img + img {
+  .product-card:hover .product-card__media img:nth-child(2) {
     opacity: 1;
+  }
+}
+/* Phones: a card with several photos shows them in turn, 5 seconds each, with a soft crossfade.
+   The first photo stays underneath; the others fade over it in order, then all fade back. */
+@media (max-width: 767px) and (prefers-reduced-motion: no-preference) {
+  .product-card__media[data-slides='2'] img:nth-child(2) {
+    animation: card-photos-2 10s linear infinite;
+  }
+  .product-card__media[data-slides='3'] img:nth-child(2) {
+    animation: card-photos-3a 15s linear infinite;
+  }
+  .product-card__media[data-slides='3'] img:nth-child(3) {
+    animation: card-photos-3b 15s linear infinite;
+  }
+  /* Neighbouring cards change a moment apart rather than all at once */
+  .product-grid > :nth-child(even) .product-card__media img {
+    animation-delay: 1.2s;
+  }
+}
+@keyframes card-photos-2 {
+  0%,
+  41% {
+    opacity: 0;
+  }
+  50%,
+  91% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes card-photos-3a {
+  0%,
+  27.3% {
+    opacity: 0;
+  }
+  33.3%,
+  94% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes card-photos-3b {
+  0%,
+  60.7% {
+    opacity: 0;
+  }
+  66.7%,
+  94% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
   }
 }
 .product-card__badges {
@@ -1396,7 +1453,7 @@
 }
 .gallery__stage {
   position: relative;
-  aspect-ratio: 4 / 5;
+  aspect-ratio: 1 / 1; /* square everywhere, so photos are framed the same on phone and desktop */
   overflow: hidden;
   border-radius: var(--radius-md);
   background: var(--paper);
@@ -1404,11 +1461,6 @@
   user-select: none;
   -webkit-user-select: none;
   outline-offset: 3px;
-}
-@media (max-width: 1023px) {
-  .gallery__stage {
-    aspect-ratio: 1 / 1; /* shorter on phones, so the details stay close */
-  }
 }
 .gallery__slide {
   position: absolute;
